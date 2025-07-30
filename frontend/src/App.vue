@@ -3,7 +3,8 @@
     <h2>Bots conectados</h2>
     <ul>
       <li v-for="bot in bots" :key="bot.id">
-        {{ bot.id }} - {{ bot.estado }}
+        <strong>ID:</strong> {{ bot.id }}<br />
+        <strong>Conectado desde:</strong> {{ new Date(bot.connectedAt).toLocaleString() }}
       </li>
     </ul>
   </div>
@@ -13,16 +14,23 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 
 const bots = ref([]);
-let ws;
+let intervalId;
+
+async function fetchBots() {
+  try {
+    const res = await fetch(import.meta.env.VITE_API_URL + '/api/bots');
+    bots.value = await res.json();
+  } catch (e) {
+    bots.value = [];
+  }
+}
 
 onMounted(() => {
-  ws = new WebSocket(import.meta.env.VITE_WS_URL);
-  ws.onmessage = (event) => {
-    bots.value = JSON.parse(event.data);
-  };
+  fetchBots();
+  intervalId = setInterval(fetchBots, 2000); // Actualiza cada 2 segundos
 });
 
 onUnmounted(() => {
-  if (ws) ws.close();
+  clearInterval(intervalId);
 });
 </script>
