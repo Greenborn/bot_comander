@@ -8,6 +8,9 @@
     "dev:all": "concurrently \"cd ../backend && npm run dev\" \"vite\""
   },
   "dependencies": {
+    "@popperjs/core": "^2.11.8",
+    "bootstrap": "^5.3.7",
+    "bootstrap-icons": "^1.13.1",
     "vue": "^3.4.0"
   },
   "devDependencies": {
