@@ -133,14 +133,31 @@ const bots = ref([]);
 let ws;
 
 onMounted(() => {
+  console.log('VITE_WS_URL:', import.meta.env.VITE_WS_URL);
   ws = new WebSocket(import.meta.env.VITE_WS_URL);
+  
+  ws.onopen = () => {
+    console.log('WebSocket conectado exitosamente');
+  };
+  
+  ws.onerror = (error) => {
+    console.error('Error de WebSocket:', error);
+  };
+  
+  ws.onclose = (event) => {
+    console.log('WebSocket cerrado:', event.code, event.reason);
+  };
+  
   ws.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
+      console.log('Mensaje recibido:', data);
       if (data.type === 'bots') {
         bots.value = data.bots;
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error('Error parseando mensaje:', e);
+    }
   };
 });
 
