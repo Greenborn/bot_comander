@@ -14,23 +14,21 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 
 const bots = ref([]);
-let intervalId;
-
-async function fetchBots() {
-  try {
-    const res = await fetch(import.meta.env.VITE_API_URL + '/api/bots');
-    bots.value = await res.json();
-  } catch (e) {
-    bots.value = [];
-  }
-}
+let ws;
 
 onMounted(() => {
-  fetchBots();
-  intervalId = setInterval(fetchBots, 2000); // Actualiza cada 2 segundos
+  ws = new WebSocket(import.meta.env.VITE_WS_URL);
+  ws.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      if (data.type === 'bots') {
+        bots.value = data.bots;
+      }
+    } catch (e) {}
+  };
 });
 
 onUnmounted(() => {
-  clearInterval(intervalId);
+  if (ws) ws.close();
 });
 </script>
