@@ -1,0 +1,24 @@
+{
+  "name": "bot_comander",
+  "version": "1.0.0",
+  "description": "Sistema de control y monitoreo de bots a través de WebSockets en tiempo real.",
+  "main": "test_bots.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Greenborn/bot_comander.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Greenborn/bot_comander/issues"
+  },
+  "homepage": "https://github.com/Greenborn/bot_comander#readme",
+  "dependencies": {
+    "ws": "^8.18.3"
+  }
+}
