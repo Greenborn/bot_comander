@@ -5,10 +5,12 @@
  * definido en PROTOCOL.md
  * 
  * Para usar en tu proyecto:
- * 1. Copia este archivo a tu proyecto de bot
- * 2. Instala dependencias: npm install ws
- * 3. Adapta las acciones según tus necesidades
- * 4. Consulta PROTOCOL.md para especificaciones completas
+ * 1. Registra tu bot: npm run register-bot TuBotName
+ * 2. Copia la API key generada al campo config.apiKey 
+ * 3. Copia este archivo a tu proyecto de bot
+ * 4. Instala dependencias: npm install ws
+ * 5. Adapta las acciones según tus necesidades
+ * 6. Consulta PROTOCOL.md para especificaciones completas
  */
 
 const WebSocket = require('ws');
@@ -18,6 +20,8 @@ class BotClient {
     this.config = {
       serverUrl: 'ws://localhost:8080',
       botName: 'ExampleBot',
+      username: 'ExampleBot',  // REQUERIDO: Nombre de usuario registrado
+      apiKey: 'bot_examplebot_123456_abcdef...', // REQUERIDO: API key del bot
       heartbeatInterval: 30000,
       reconnectDelay: 5000,
       ...config
@@ -28,6 +32,7 @@ class BotClient {
     this.actions = new Map();
     this.activeActions = new Map();
     this.isConnected = false;
+    this.isAuthenticated = false;
     
     this.setupActions();
   }
@@ -126,6 +131,10 @@ class BotClient {
           this.handleWelcome(message);
           break;
           
+        case 'error':
+          this.handleError(message);
+          break;
+          
         case 'get_actions':
           this.handleGetActions(message);
           break;
@@ -151,9 +160,26 @@ class BotClient {
    * Manejador de identificación
    */
   handleIdentifyRequest(message) {
+    // Verificar que tenemos credenciales válidas
+    if (!this.config.username || !this.config.apiKey) {
+      console.error(`[${this.config.botName}] ❌ Error: Faltan credenciales de autenticación`);
+      console.error('💡 Ejecuta: npm run register-bot TuBotName');
+      console.error('   Y configura username y apiKey en este archivo');
+      process.exit(1);
+    }
+    
+    if (this.config.apiKey.includes('...')) {
+      console.error(`[${this.config.botName}] ❌ Error: API key no configurada`);
+      console.error('💡 Reemplaza el valor de apiKey con la clave generada');
+      process.exit(1);
+    }
+    
+    console.log(`[${this.config.botName}] 🔐 Enviando credenciales de autenticación...`);
     this.send({
       type: 'identify',
       clientType: 'bot',
+      username: this.config.username,
+      apiKey: this.config.apiKey,
       botName: this.config.botName
     });
   }
@@ -163,7 +189,35 @@ class BotClient {
    */
   handleWelcome(message) {
     console.log(`[${this.config.botName}] ${message.message}`);
-    this.startHeartbeat();
+    
+    if (message.authenticated) {
+      console.log(`[${this.config.botName}] ✅ Autenticación exitosa!`);
+      this.isAuthenticated = true;
+      this.startHeartbeat();
+    } else {
+      console.log(`[${this.config.botName}] ⚠️  Conexión establecida sin autenticación`);
+    }
+  }
+
+  /**
+   * Manejador de errores
+   */
+  handleError(message) {
+    console.error(`[${this.config.botName}] ❌ Error del servidor: ${message.message}`);
+    
+    // Manejar errores de autenticación
+    if (message.code === 'INVALID_CREDENTIALS' || 
+        message.code === 'MISSING_CREDENTIALS' ||
+        message.code === 'BOT_NOT_REGISTERED' ||
+        message.code === 'BOT_DEACTIVATED') {
+      
+      console.error(`[${this.config.botName}] 🔑 Error de autenticación: ${message.code}`);
+      console.error('💡 Verifica que el bot esté registrado y la API key sea correcta');
+      console.error('   Ejecuta: npm run register-bot ' + this.config.username);
+      
+      // No reintentar para errores de autenticación
+      process.exit(1);
+    }
   }
 
   /**

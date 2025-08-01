@@ -6,7 +6,12 @@
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "setup-auth": "node setup-auth.js"
+    "setup-auth": "node setup-auth.js",
+    "register-bot": "node scripts/manage-bot-keys.js register",
+    "list-bots": "node scripts/manage-bot-keys.js list",
+    "deactivate-bot": "node scripts/manage-bot-keys.js deactivate",
+    "reactivate-bot": "node scripts/manage-bot-keys.js reactivate",
+    "delete-bot": "node scripts/manage-bot-keys.js delete"
   },
   "repository": {
     "type": "git",

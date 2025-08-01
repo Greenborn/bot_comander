@@ -1,0 +1,16 @@
+{
+  "TestBot": {
+    "username": "TestBot",
+    "apiKeyHash": "$2b$12$f1dMn6hnRezvLkvSCACEi.WLEyUlnhVvIkadhYyQZjT6siN.kbal6",
+    "createdAt": "2025-08-01T05:26:18.183Z",
+    "lastUpdated": "2025-08-01T05:26:18.183Z",
+    "isActive": true
+  },
+  "TestBot01": {
+    "username": "TestBot01",
+    "apiKeyHash": "$2b$12$gHT3gC3OsGsuPfVKoECUbeNlyMrV89PEtqC92lPHT9JgrKsAOUtCG",
+    "createdAt": "2025-08-01T05:28:51.693Z",
+    "lastUpdated": "2025-08-01T05:35:01.885Z",
+    "isActive": true
+  }
+}

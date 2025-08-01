@@ -135,21 +135,59 @@ Los mensajes WebSocket se intercambian después de la autenticación HTTP inicia
 ```
 
 #### 1.2 Respuesta de Identificación (Cliente → Servidor)
+
+**Para Paneles:**
 ```json
 {
   "type": "identify",
-  "clientType": "bot", // o "panel"
-  "botName": "WebCrawler-01" // solo para bots, opcional
+  "clientType": "panel"
+}
+```
+
+**Para Bots (con autenticación):**
+```json
+{
+  "type": "identify",
+  "clientType": "bot",
+  "username": "WebCrawler01",  // nombre de usuario del bot registrado
+  "apiKey": "bot_webcrawler01_abc123...", // API key generada
+  "botName": "Web Crawler v1.0" // nombre descriptivo opcional
 }
 ```
 
 #### 1.3 Mensaje de Bienvenida (Servidor → Cliente)
+
+**Para Paneles:**
 ```json
 {
   "type": "welcome",
-  "message": "¡Bienvenido, WebCrawler-01!" // o "¡Panel de control conectado!"
+  "message": "¡Panel de control conectado!"
 }
 ```
+
+**Para Bots Autenticados:**
+```json
+{
+  "type": "welcome",
+  "message": "¡Bienvenido, Web Crawler v1.0!",
+  "authenticated": true
+}
+```
+
+#### 1.4 Error de Autenticación (Servidor → Bot)
+```json
+{
+  "type": "error",
+  "code": "INVALID_CREDENTIALS",
+  "message": "Autenticación fallida: API key inválida"
+}
+```
+
+Códigos de error de autenticación:
+- `MISSING_CREDENTIALS`: Falta username o apiKey
+- `INVALID_CREDENTIALS`: Credenciales incorrectas
+- `BOT_NOT_REGISTERED`: Bot no está registrado
+- `BOT_DEACTIVATED`: Bot está desactivado
 
 ### 2. Heartbeat y Estado
 
@@ -454,11 +492,13 @@ Los mensajes WebSocket se intercambian después de la autenticación HTTP inicia
 ## Mejores Prácticas
 
 ### Para Bots
-1. **Identificación**: Siempre responder al `identify_request` con información precisa
-2. **Heartbeat**: Enviar heartbeat cada 30 segundos con estado actualizado
-3. **Acciones**: Validar parámetros antes de ejecutar acciones
-4. **Estados**: Mantener estado consistente y reportar cambios
-5. **Errores**: Usar códigos de error estándar y proporcionar mensajes descriptivos
+1. **Registro**: Registrarse usando el script de gestión antes de conectar
+2. **Credenciales**: Guardar de forma segura username y API key
+3. **Identificación**: Incluir username y apiKey al conectar
+4. **Heartbeat**: Enviar heartbeat cada 30 segundos con estado actualizado
+5. **Acciones**: Validar parámetros antes de ejecutar acciones
+6. **Estados**: Mantener estado consistente y reportar cambios
+7. **Errores**: Usar códigos de error estándar y proporcionar mensajes descriptivos
 
 ### Para Paneles
 1. **Autenticación**: Autenticarse via HTTP antes de usar WebSocket
@@ -469,12 +509,14 @@ Los mensajes WebSocket se intercambian después de la autenticación HTTP inicia
 6. **Token Management**: Renovar tokens antes de que expiren (24h)
 
 ### Para el Servidor
-1. **Autenticación**: Validar tokens JWT antes de permitir acceso a WebSocket
-2. **Routing**: Enrutar mensajes según `targetBot` cuando sea necesario
-3. **Validación**: Validar estructura de mensajes antes de procesar
-4. **Estado**: Mantener estado actualizado de todos los clientes
-5. **Broadcast**: Enviar actualizaciones solo a clientes relevantes
-6. **Rate Limiting**: Aplicar límites de velocidad en endpoints críticos
+1. **Autenticación**: Validar tokens JWT para paneles y API keys para bots
+2. **Registro de bots**: Mantener archivo seguro de credenciales de bots
+3. **Routing**: Enrutar mensajes según `targetBot` cuando sea necesario
+4. **Validación**: Validar estructura de mensajes antes de procesar
+5. **Estado**: Mantener estado actualizado de todos los clientes
+6. **Broadcast**: Enviar actualizaciones solo a clientes relevantes
+7. **Rate Limiting**: Aplicar límites de velocidad en endpoints críticos
+8. **Logs de seguridad**: Registrar intentos de autenticación fallidos
 
 ## Flujo de Autenticación Completo
 
@@ -489,13 +531,32 @@ Los mensajes WebSocket se intercambian después de la autenticación HTTP inicia
 7. Panel ← welcome message
 ```
 
-### 2. Conexión de Bot
+### 2. Conexión de Bot (con autenticación)
 ```
-1. Bot → WebSocket (sin autenticación previa)
+1. Bot → WebSocket (conexión inicial)
 2. Bot ← identify_request  
-3. Bot → identify (type: "bot", botName)
-4. Bot ← welcome message
-5. Bot inicia heartbeat loop
+3. Bot → identify (type: "bot", username, apiKey, botName)
+4. Servidor valida credenciales
+5. Bot ← welcome message (si es válido) o error (si es inválido)
+6. Bot inicia heartbeat loop (solo si autenticado)
+```
+
+### 3. Gestión de API Keys
+```bash
+# Registrar nuevo bot
+npm run register-bot WebCrawler01
+
+# Listar bots registrados  
+npm run list-bots
+
+# Desactivar bot
+npm run deactivate-bot WebCrawler01
+
+# Reactivar bot
+npm run reactivate-bot WebCrawler01
+
+# Eliminar bot
+npm run delete-bot WebCrawler01
 ```
 
 ## Versionado

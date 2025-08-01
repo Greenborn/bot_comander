@@ -15,6 +15,50 @@ dotenv.config({ path: '../.env' });
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Ruta del archivo de configuración de bots
+const BOT_KEYS_FILE = path.resolve(__dirname, '../../bot-keys.json');
+
+// Cargar configuración de bots
+function loadBotKeys() {
+  if (!fs.existsSync(BOT_KEYS_FILE)) {
+    return {};
+  }
+  
+  try {
+    const content = fs.readFileSync(BOT_KEYS_FILE, 'utf8');
+    return JSON.parse(content);
+  } catch (error) {
+    console.error('❌ Error al leer archivo de claves de bots:', error.message);
+    return {};
+  }
+}
+
+// Validar API key de bot
+async function validateBotApiKey(username, apiKey) {
+  const botKeys = loadBotKeys();
+  const botConfig = botKeys[username];
+  
+  if (!botConfig) {
+    return { valid: false, reason: 'Bot no registrado' };
+  }
+  
+  if (!botConfig.isActive) {
+    return { valid: false, reason: 'Bot desactivado' };
+  }
+  
+  try {
+    const isValid = await bcrypt.compare(apiKey, botConfig.apiKeyHash);
+    return { 
+      valid: isValid, 
+      reason: isValid ? 'API key válida' : 'API key inválida',
+      botConfig: isValid ? botConfig : null
+    };
+  } catch (error) {
+    console.error('Error validando API key:', error);
+    return { valid: false, reason: 'Error interno' };
+  }
+}
+
 // Función para construir el frontend
 function buildFrontend() {
   return new Promise((resolve, reject) => {
@@ -113,9 +157,12 @@ function broadcastBotsList() {
     .filter(([id, data]) => data.type === 'bot')
     .map(([id, data]) => ({
       id,
+      username: data.username,
+      botName: data.botName,
       connectedAt: data.connectedAt,
       type: data.type,
-      lastActivity: data.lastActivity || data.connectedAt
+      lastActivity: data.lastActivity || data.connectedAt,
+      authenticated: data.authenticated || false
     }));
     
   const panels = Object.entries(clients)
@@ -166,38 +213,68 @@ wss.on('connection', (ws, req) => {
     clientId 
   }));
 
-  ws.on('message', (data) => {
+  ws.on('message', async (data) => {
     try {
       const message = JSON.parse(data.toString());
       
       // Manejar identificación del cliente
       if (message.type === 'identify') {
-        if (message.clientType === 'bot' || message.clientType === 'panel') {
+        if (message.clientType === 'bot') {
+          // Validar API key para bots
+          if (!message.username || !message.apiKey) {
+            ws.send(JSON.stringify({ 
+              type: 'error', 
+              code: 'MISSING_CREDENTIALS',
+              message: 'Se requiere username y apiKey para bots' 
+            }));
+            ws.close();
+            return;
+          }
+          
+          const validation = await validateBotApiKey(message.username, message.apiKey);
+          
+          if (!validation.valid) {
+            console.log(`❌ Bot "${message.username}" rechazado: ${validation.reason}`);
+            ws.send(JSON.stringify({ 
+              type: 'error', 
+              code: 'INVALID_CREDENTIALS',
+              message: `Autenticación fallida: ${validation.reason}` 
+            }));
+            ws.close();
+            return;
+          }
+          
+          // Bot autenticado exitosamente
+          clients[clientId].type = 'bot';
+          clients[clientId].username = message.username;
+          clients[clientId].botName = message.botName || message.username;
+          clients[clientId].lastActivity = Date.now();
+          clients[clientId].authenticated = true;
+          
+          console.log(`✅ Bot autenticado: ${clients[clientId].botName} (${message.username})`);
+          ws.send(JSON.stringify({ 
+            type: 'welcome', 
+            message: `¡Bienvenido, ${clients[clientId].botName}!`,
+            authenticated: true
+          }));
+          
+        } else if (message.clientType === 'panel') {
           clients[clientId].type = message.clientType;
           clients[clientId].lastActivity = Date.now();
           
-          if (message.clientType === 'bot') {
-            clients[clientId].botName = message.botName || `Bot-${clientId.slice(-4)}`;
-            console.log(`Bot conectado: ${clients[clientId].botName} (${clientId})`);
-            ws.send(JSON.stringify({ 
-              type: 'welcome', 
-              message: `¡Bienvenido, ${clients[clientId].botName}!` 
-            }));
-          } else {
-            console.log(`Panel de control conectado: ${clientId}`);
-            ws.send(JSON.stringify({ 
-              type: 'welcome', 
-              message: '¡Panel de control conectado!' 
-            }));
-          }
-          
-          broadcastBotsList();
+          console.log(`Panel de control conectado: ${clientId}`);
+          ws.send(JSON.stringify({ 
+            type: 'welcome', 
+            message: '¡Panel de control conectado!' 
+          }));
         } else {
           ws.send(JSON.stringify({ 
             type: 'error', 
             message: 'Tipo de cliente no válido. Use "bot" o "panel"' 
           }));
         }
+        
+        broadcastBotsList();
       }
       
       // Manejar heartbeat de bots
@@ -293,10 +370,12 @@ app.get('/api/bots', authenticateToken, (req, res) => {
     .filter(([id, data]) => data.type === 'bot')
     .map(([id, data]) => ({
       id,
+      username: data.username,
       botName: data.botName,
       connectedAt: data.connectedAt,
       lastActivity: data.lastActivity,
-      type: data.type
+      type: data.type,
+      authenticated: data.authenticated || false
     }));
     
   const panels = Object.entries(clients)
