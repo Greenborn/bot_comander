@@ -2,10 +2,11 @@
   "name": "bot_comander",
   "version": "1.0.0",
   "description": "Sistema de control y monitoreo de bots a través de WebSockets en tiempo real.",
-  "main": "test_bots.js",
+  "main": "backend/src/index.js",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node test/test_bots.js",
+    "test:bots": "node test/test_bots.js",
     "setup-auth": "node scripts/setup-auth.js",
     "register-bot": "node scripts/manage-bot-keys.js register",
     "list-bots": "node scripts/manage-bot-keys.js list",
