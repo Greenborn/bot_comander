@@ -34,7 +34,18 @@ cd ../frontend
 npm install
 ```
 
-### 3. Ejecutar en Desarrollo
+### 3. Configurar Autenticación
+
+Antes de ejecutar el servidor por primera vez, configura las credenciales de acceso:
+
+```bash
+cd backend
+npm run setup-auth
+```
+
+Este script te pedirá un usuario y contraseña para acceder al panel de control. La contraseña se almacenará de forma segura como hash en el archivo `.env`.
+
+### 4. Ejecutar en Desarrollo
 ```bash
 # Backend (en una terminal)
 cd backend
@@ -50,7 +61,11 @@ npm run dev
 El proyecto utiliza las siguientes variables de entorno:
 
 - `API_PORT`: Puerto del servidor backend (default: 3000)
+- `API_HOST`: Host del servidor backend (default: 0.0.0.0)
 - `VITE_WS_URL`: URL del WebSocket para el frontend (default: ws://localhost:3000)
+- `AUTH_USERNAME`: Usuario para acceso al panel (configurado con setup-auth.js)
+- `AUTH_PASSWORD_HASH`: Hash de la contraseña (configurado con setup-auth.js)
+- `JWT_SECRET`: Secreto para tokens JWT (generado automáticamente)
 
 Ver `ENVIRONMENT.md` para documentación completa.
 
@@ -58,7 +73,8 @@ Ver `ENVIRONMENT.md` para documentación completa.
 
 Este servicio utiliza:
 - **Backend**: Node.js + Express + WebSocket Server
-- **Frontend**: Vue.js + Vite + Bootstrap 5
+- **Frontend**: Vue.js + Vite + Bootstrap 5  
+- **Autenticación**: JWT tokens con bcrypt para hash de contraseñas
 - **Comunicación**: WebSockets para tiempo real con identificación de tipos de cliente
 
 ### Tipos de Clientes

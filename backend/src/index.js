@@ -6,6 +6,9 @@ import { spawn, exec } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import rateLimit from 'express-rate-limit';
 
 dotenv.config({ path: '../.env' });
 
@@ -74,6 +77,33 @@ app.use(express.static(frontendDistPath));
 
 // Middleware para parsear JSON
 app.use(express.json());
+
+// Rate limiting para el endpoint de login
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 5, // máximo 5 intentos por IP
+  message: { error: 'Demasiados intentos de login. Intenta de nuevo en 15 minutos.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Middleware para verificar JWT
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Token de acceso requerido' });
+  }
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'Token inválido' });
+    }
+    req.user = user;
+    next();
+  });
+}
 
 const clients = {};
 
@@ -207,8 +237,58 @@ wss.on('connection', (ws, req) => {
 });
 
 
-// Endpoint para obtener bots conectados
-app.get('/api/bots', (req, res) => {
+// Endpoint de login
+app.post('/api/login', loginLimiter, async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Usuario y contraseña son requeridos' });
+    }
+
+    // Verificar que las credenciales estén configuradas
+    if (!process.env.AUTH_USERNAME || !process.env.AUTH_PASSWORD_HASH) {
+      return res.status(500).json({ 
+        error: 'Autenticación no configurada. Ejecuta "npm run setup-auth" para configurar.' 
+      });
+    }
+
+    // Verificar usuario
+    if (username !== process.env.AUTH_USERNAME) {
+      return res.status(401).json({ error: 'Credenciales inválidas' });
+    }
+
+    // Verificar contraseña
+    const isValidPassword = await bcrypt.compare(password, process.env.AUTH_PASSWORD_HASH);
+    if (!isValidPassword) {
+      return res.status(401).json({ error: 'Credenciales inválidas' });
+    }
+
+    // Generar token JWT
+    const token = jwt.sign(
+      { username: username },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    res.json({ 
+      success: true, 
+      token,
+      message: 'Login exitoso' 
+    });
+  } catch (error) {
+    console.error('Error en login:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Endpoint para verificar token
+app.get('/api/verify-token', authenticateToken, (req, res) => {
+  res.json({ valid: true, username: req.user.username });
+});
+
+// Endpoint para obtener bots conectados (protegido)
+app.get('/api/bots', authenticateToken, (req, res) => {
   const bots = Object.entries(clients)
     .filter(([id, data]) => data.type === 'bot')
     .map(([id, data]) => ({

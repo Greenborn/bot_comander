@@ -1,15 +1,127 @@
-# Protocolo WebSocket - Bot Commander
+# Protocolo WebSocket y API HTTP - Bot Commander
 
-Documentación completa del protocolo de comunicación WebSocket para Bot Commander.
+Documentación completa del protocolo de comunicación WebSocket y endpoints HTTP para Bot Commander.
 
 ## Visión General
 
-Bot Commander utiliza WebSockets para comunicación bidireccional en tiempo real entre:
+Bot Commander utiliza:
+- **WebSockets**: Para comunicación bidireccional en tiempo real entre bots y paneles
+- **HTTP REST API**: Para autenticación y operaciones administrativas
+
+### Componentes
 - **Bots**: Clientes automatizados que ejecutan acciones
 - **Paneles**: Interfaces de usuario para control y monitoreo
 - **Servidor**: Coordinador central de comunicaciones
 
-## Tipos de Mensajes
+## API HTTP Endpoints
+
+### Autenticación
+
+#### POST /api/login
+Autentica un usuario y devuelve un token JWT.
+
+**Request:**
+```json
+{
+  "username": "admin",
+  "password": "contraseña"
+}
+```
+
+**Response (Éxito):**
+```json
+{
+  "success": true,
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "message": "Login exitoso"
+}
+```
+
+**Response (Error):**
+```json
+{
+  "error": "Credenciales inválidas"
+}
+```
+
+**Rate Limiting:**
+- Máximo 5 intentos por IP cada 15 minutos
+- Headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`
+
+#### GET /api/verify-token
+Verifica la validez de un token JWT.
+
+**Headers:**
+```
+Authorization: Bearer <jwt_token>
+```
+
+**Response (Válido):**
+```json
+{
+  "valid": true,
+  "username": "admin"
+}
+```
+
+**Response (Inválido):**
+```json
+{
+  "error": "Token inválido"
+}
+```
+
+### Datos del Sistema
+
+#### GET /api/bots
+Obtiene información de bots conectados (requiere autenticación).
+
+**Headers:**
+```
+Authorization: Bearer <jwt_token>
+```
+
+**Response:**
+```json
+{
+  "bots": [
+    {
+      "id": "bot_id_123",
+      "botName": "WebCrawler-01",
+      "connectedAt": 1640995200000,
+      "lastActivity": 1640995500000,
+      "type": "bot"
+    }
+  ],
+  "panels": [
+    {
+      "id": "panel_id_456",
+      "connectedAt": 1640995300000,
+      "type": "panel"
+    }
+  ],
+  "stats": {
+    "totalBots": 1,
+    "totalPanels": 1,
+    "totalClients": 2
+  }
+}
+```
+
+### Códigos de Estado HTTP
+
+| Código | Descripción | Contexto |
+|--------|-------------|----------|
+| `200` | OK | Operación exitosa |
+| `400` | Bad Request | Datos de entrada inválidos |
+| `401` | Unauthorized | Credenciales inválidas o token faltante |
+| `403` | Forbidden | Token inválido o expirado |
+| `429` | Too Many Requests | Rate limit excedido |
+| `500` | Internal Server Error | Error del servidor |
+
+## Tipos de Mensajes WebSocket
+
+Los mensajes WebSocket se intercambian después de la autenticación HTTP inicial.
 
 ### 1. Identificación de Cliente
 
@@ -349,16 +461,42 @@ Bot Commander utiliza WebSockets para comunicación bidireccional en tiempo real
 5. **Errores**: Usar códigos de error estándar y proporcionar mensajes descriptivos
 
 ### Para Paneles
-1. **Identificación**: Identificarse como `panel` al conectar
-2. **IDs únicos**: Usar IDs únicos para `requestId` y `actionId`
-3. **Timeouts**: Implementar timeouts para acciones de larga duración
-4. **Manejo de errores**: Manejar todos los tipos de respuesta (éxito, error, timeout)
+1. **Autenticación**: Autenticarse via HTTP antes de usar WebSocket
+2. **Identificación**: Identificarse como `panel` al conectar
+3. **IDs únicos**: Usar IDs únicos para `requestId` y `actionId`
+4. **Timeouts**: Implementar timeouts para acciones de larga duración
+5. **Manejo de errores**: Manejar todos los tipos de respuesta (éxito, error, timeout)
+6. **Token Management**: Renovar tokens antes de que expiren (24h)
 
 ### Para el Servidor
-1. **Routing**: Enrutar mensajes según `targetBot` cuando sea necesario
-2. **Validación**: Validar estructura de mensajes antes de procesar
-3. **Estado**: Mantener estado actualizado de todos los clientes
-4. **Broadcast**: Enviar actualizaciones solo a clientes relevantes
+1. **Autenticación**: Validar tokens JWT antes de permitir acceso a WebSocket
+2. **Routing**: Enrutar mensajes según `targetBot` cuando sea necesario
+3. **Validación**: Validar estructura de mensajes antes de procesar
+4. **Estado**: Mantener estado actualizado de todos los clientes
+5. **Broadcast**: Enviar actualizaciones solo a clientes relevantes
+6. **Rate Limiting**: Aplicar límites de velocidad en endpoints críticos
+
+## Flujo de Autenticación Completo
+
+### 1. Autenticación del Panel
+```
+1. Panel → POST /api/login (username, password)
+2. Servidor ← 200 OK (token JWT)
+3. Panel guarda token en localStorage
+4. Panel → WebSocket con credentials válidos
+5. Panel ← identify_request
+6. Panel → identify (type: "panel")
+7. Panel ← welcome message
+```
+
+### 2. Conexión de Bot
+```
+1. Bot → WebSocket (sin autenticación previa)
+2. Bot ← identify_request  
+3. Bot → identify (type: "bot", botName)
+4. Bot ← welcome message
+5. Bot inicia heartbeat loop
+```
 
 ## Versionado
 

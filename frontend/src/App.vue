@@ -1,23 +1,107 @@
 <template>
   <div class="container-fluid">
-    <!-- Header -->
-    <nav class="navbar navbar-dark bg-dark mb-4">
-      <div class="container-fluid">
-        <span class="navbar-brand mb-0 h1">
-          <i class="bi bi-robot"></i>
-          Bot Commander
-        </span>
-        <span class="navbar-text">
-          <span class="badge bg-success me-2">{{ stats.totalBots }}</span>
-          Bots
-          <span class="badge bg-info ms-3 me-2">{{ stats.totalPanels }}</span>
-          Paneles
-          <span class="badge ms-3 me-2" :class="connectionStatus === 'Conectado' ? 'bg-success' : 'bg-danger'">
-            {{ connectionStatus }}
-          </span>
-        </span>
+    <!-- Login Form -->
+    <div v-if="!isAuthenticated" class="d-flex justify-content-center align-items-center vh-100">
+      <div class="card shadow-lg" style="width: 400px;">
+        <div class="card-body">
+          <div class="text-center mb-4">
+            <i class="bi bi-robot fs-1 text-primary"></i>
+            <h3 class="mt-2">Bot Commander</h3>
+            <p class="text-muted">Acceso al Panel de Control</p>
+          </div>
+          
+          <form @submit.prevent="login">
+            <div class="mb-3">
+              <label for="username" class="form-label">Usuario</label>
+              <div class="input-group">
+                <span class="input-group-text">
+                  <i class="bi bi-person"></i>
+                </span>
+                <input 
+                  type="text" 
+                  class="form-control" 
+                  id="username"
+                  v-model="loginForm.username"
+                  placeholder="Ingrese su usuario"
+                  :disabled="isLoggingIn"
+                  required
+                >
+              </div>
+            </div>
+            
+            <div class="mb-3">
+              <label for="password" class="form-label">Contraseña</label>
+              <div class="input-group">
+                <span class="input-group-text">
+                  <i class="bi bi-lock"></i>
+                </span>
+                <input 
+                  type="password" 
+                  class="form-control" 
+                  id="password"
+                  v-model="loginForm.password"
+                  placeholder="Ingrese su contraseña"
+                  :disabled="isLoggingIn"
+                  required
+                >
+              </div>
+            </div>
+            
+            <div v-if="loginError" class="alert alert-danger" role="alert">
+              <i class="bi bi-exclamation-triangle"></i>
+              {{ loginError }}
+            </div>
+            
+            <button 
+              type="submit" 
+              class="btn btn-primary w-100"
+              :disabled="isLoggingIn"
+            >
+              <span v-if="isLoggingIn" class="spinner-border spinner-border-sm me-2"></span>
+              <i v-else class="bi bi-box-arrow-in-right me-2"></i>
+              {{ isLoggingIn ? 'Iniciando sesión...' : 'Iniciar Sesión' }}
+            </button>
+          </form>
+        </div>
       </div>
-    </nav>
+    </div>
+
+    <!-- Main Dashboard (only shown when authenticated) -->
+    <div v-else>
+      <!-- Header -->
+      <nav class="navbar navbar-dark bg-dark mb-4">
+        <div class="container-fluid">
+          <span class="navbar-brand mb-0 h1">
+            <i class="bi bi-robot"></i>
+            Bot Commander
+          </span>
+          <div class="d-flex align-items-center">
+            <span class="navbar-text me-3">
+              <span class="badge bg-success me-2">{{ stats.totalBots }}</span>
+              Bots
+              <span class="badge bg-info ms-3 me-2">{{ stats.totalPanels }}</span>
+              Paneles
+              <span class="badge ms-3 me-2" :class="connectionStatus === 'Conectado' ? 'bg-success' : 'bg-danger'">
+                {{ connectionStatus }}
+              </span>
+            </span>
+            <div class="dropdown">
+              <button class="btn btn-outline-light btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                <i class="bi bi-person-circle"></i>
+                {{ currentUser }}
+              </button>
+              <ul class="dropdown-menu">
+                <li>
+                  <button class="dropdown-item" @click="logout">
+                    <i class="bi bi-box-arrow-right"></i>
+                    Cerrar Sesión
+                  </button>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </nav>
 
     <!-- Main Content -->
     <div class="container">
@@ -194,6 +278,7 @@
         </div>
       </div>
     </div>
+    </div>
   </div>
 </template>
 
@@ -207,9 +292,104 @@ const stats = ref({
   totalPanels: 0
 });
 const connectionStatus = ref('Desconectado');
-let ws;
+const isAuthenticated = ref(false);
+const isLoggingIn = ref(false);
+const loginError = ref('');
+const currentUser = ref('');
+const loginForm = ref({
+  username: '',
+  password: ''
+});
 
-onMounted(() => {
+let ws;
+let authToken = '';
+
+// Verificar si ya hay un token válido al cargar la página
+onMounted(async () => {
+  const savedToken = localStorage.getItem('bot_commander_token');
+  if (savedToken) {
+    if (await verifyToken(savedToken)) {
+      authToken = savedToken;
+      isAuthenticated.value = true;
+      initializeWebSocket();
+    } else {
+      localStorage.removeItem('bot_commander_token');
+    }
+  }
+});
+
+async function verifyToken(token) {
+  try {
+    const response = await fetch('/api/verify-token', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      currentUser.value = data.username;
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error('Error verificando token:', error);
+    return false;
+  }
+}
+
+async function login() {
+  if (isLoggingIn.value) return;
+  
+  isLoggingIn.value = true;
+  loginError.value = '';
+  
+  try {
+    const response = await fetch('/api/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        username: loginForm.value.username,
+        password: loginForm.value.password
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (response.ok) {
+      authToken = data.token;
+      currentUser.value = loginForm.value.username;
+      localStorage.setItem('bot_commander_token', authToken);
+      isAuthenticated.value = true;
+      loginForm.value.username = '';
+      loginForm.value.password = '';
+      initializeWebSocket();
+    } else {
+      loginError.value = data.error || 'Error al iniciar sesión';
+    }
+  } catch (error) {
+    console.error('Error en login:', error);
+    loginError.value = 'Error de conexión. Verifique su conexión a internet.';
+  } finally {
+    isLoggingIn.value = false;
+  }
+}
+
+function logout() {
+  localStorage.removeItem('bot_commander_token');
+  authToken = '';
+  isAuthenticated.value = false;
+  currentUser.value = '';
+  connectionStatus.value = 'Desconectado';
+  if (ws) {
+    ws.close();
+    ws = null;
+  }
+}
+
+function initializeWebSocket() {
   console.log('VITE_WS_URL:', import.meta.env.VITE_WS_URL);
   ws = new WebSocket(import.meta.env.VITE_WS_URL);
   
@@ -257,7 +437,7 @@ onMounted(() => {
       console.error('Error parseando mensaje:', e);
     }
   };
-});
+}
 
 onUnmounted(() => {
   if (ws) ws.close();
