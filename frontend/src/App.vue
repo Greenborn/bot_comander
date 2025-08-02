@@ -401,6 +401,14 @@
                     <i class="bi bi-trash"></i>
                     Limpiar
                   </button>
+                  <button 
+                    class="btn btn-sm btn-outline-info" 
+                    @click="toggleRawMode"
+                    :class="{ 'btn-info': terminalRawMode, 'btn-outline-info': !terminalRawMode }"
+                  >
+                    <i class="bi bi-code"></i>
+                    {{ terminalRawMode ? 'Normal' : 'Raw' }}
+                  </button>
                 </div>
                 <div class="d-flex gap-2 align-items-center">
                   <small class="text-light">Tamaño:</small>
@@ -445,7 +453,14 @@
                   Iniciando sesión de terminal...
                 </div>
                 <div v-for="(line, index) in terminalLines" :key="index" class="terminal-line">
-                  <span class="text-light" v-html="formatTerminalOutput(line.data)"></span>
+                  <span 
+                    :class="{
+                      'text-light': !line.isCommand,
+                      'text-success': line.isCommand,
+                      'fw-bold': line.isCommand
+                    }" 
+                    v-html="line.isCommand ? line.data : formatTerminalOutput(line.data)"
+                  ></span>
                 </div>
               </div>
               
@@ -461,6 +476,7 @@
                     placeholder="Escribe comandos directamente..."
                     v-model="terminalInput"
                     @keydown="handleTerminalKeydown"
+                    @keyup.enter="sendTerminalCommand"
                     :disabled="!terminalConnected"
                     ref="terminalInputField"
                   >
@@ -519,6 +535,7 @@ const terminalLines = ref([]);
 const terminalInput = ref('');
 const terminalCols = ref(80);
 const terminalRows = ref(24);
+const terminalRawMode = ref(false);
 const terminalInputField = ref(null);
 const terminalOutput = ref(null);
 
@@ -835,18 +852,16 @@ function handleTerminalKeydown(event) {
   
   let data = '';
   
-  // Manejar teclas especiales
+  // Solo manejar teclas especiales, NO enviar caracteres normales
   if (event.key === 'Enter') {
-    data = '\r';
-    terminalInput.value = '';
+    // El Enter se maneja en sendTerminalCommand
+    return;
   } else if (event.ctrlKey && event.key === 'c') {
     data = '\x03'; // Ctrl+C
     event.preventDefault();
   } else if (event.ctrlKey && event.key === 'd') {
     data = '\x04'; // Ctrl+D (EOF)
     event.preventDefault();
-  } else if (event.key === 'Backspace') {
-    data = '\x08';
   } else if (event.key === 'Tab') {
     data = '\t';
     event.preventDefault();
@@ -862,9 +877,8 @@ function handleTerminalKeydown(event) {
   } else if (event.key === 'ArrowLeft') {
     data = '\x1b[D';
     event.preventDefault();
-  } else if (event.key.length === 1) {
-    data = event.key;
   }
+  // NO enviar caracteres normales ni backspace aquí
   
   if (data && ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({
@@ -878,6 +892,37 @@ function handleTerminalKeydown(event) {
 
 function clearTerminal() {
   terminalLines.value = [];
+}
+
+function toggleRawMode() {
+  terminalRawMode.value = !terminalRawMode.value;
+}
+
+function sendTerminalCommand() {
+  if (!terminalConnected.value || !terminalSessionId.value || !terminalInput.value.trim()) return;
+  
+  // Mostrar el comando en la vista del terminal
+  terminalLines.value.push({
+    data: `$ ${terminalInput.value}`,
+    timestamp: new Date(),
+    isCommand: true
+  });
+  
+  // Enviar el comando completo al bot
+  const command = terminalInput.value + '\r';
+  
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: 'pty_input',
+      targetBot: selectedBot.value.id,
+      sessionId: terminalSessionId.value,
+      data: command
+    }));
+  }
+  
+  // Limpiar el input
+  terminalInput.value = '';
+  scrollTerminalToBottom();
 }
 
 function listTerminalSessions() {
@@ -918,22 +963,32 @@ function handlePtyMessage(data) {
       
     case 'pty_output':
       if (data.sessionId === terminalSessionId.value) {
-        // Para aplicaciones interactivas como htop, vamos a limitar las líneas
-        // y limpiar la salida más agresivamente
+        // Para aplicaciones interactivas como htop, implementar estrategia más agresiva
         let processedData = data.data;
         
-        // Si hay demasiadas líneas, mantener solo las últimas 100
-        if (terminalLines.value.length > 100) {
-          terminalLines.value = terminalLines.value.slice(-50);
+        // Si hay demasiadas líneas, limpiar más agresivamente
+        if (terminalLines.value.length > 50) {
+          terminalLines.value = terminalLines.value.slice(-20);
         }
         
-        // Para evitar spam de actualizaciones de htop, combinar datos pequeños
-        if (processedData.length < 50 && terminalLines.value.length > 0) {
-          // Si el último elemento es reciente (menos de 100ms), combinarlo
+        // Para htop y aplicaciones similares, combinar datos más agresivamente
+        if (processedData.length < 200 && terminalLines.value.length > 0) {
           const lastLine = terminalLines.value[terminalLines.value.length - 1];
           const timeDiff = new Date() - lastLine.timestamp;
-          if (timeDiff < 100) {
+          
+          // Si es muy reciente (menos de 200ms), combinarlo
+          if (timeDiff < 200) {
             lastLine.data += processedData;
+            lastLine.timestamp = new Date();
+            
+            // Si la línea combinada es muy larga, crear nueva línea
+            if (lastLine.data.length > 1000) {
+              terminalLines.value.push({
+                data: processedData,
+                timestamp: new Date()
+              });
+            }
+            
             scrollTerminalToBottom();
             break;
           }
@@ -987,6 +1042,18 @@ function handlePtyMessage(data) {
 function formatTerminalOutput(data) {
   if (!data) return '';
   
+  // Si está en modo raw, mostrar todo con mínimo procesamiento
+  if (terminalRawMode.value) {
+    return data
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\r\n/g, '<br>')
+      .replace(/\n/g, '<br>')
+      .replace(/\r/g, '<br>')
+      .replace(/ /g, '&nbsp;');
+  }
+  
   // Función más agresiva para limpiar códigos ANSI problemáticos
   let cleaned = data
     // Remover TODAS las secuencias de escape complejas
@@ -997,49 +1064,25 @@ function formatTerminalOutput(data) {
     .replace(/\x1B\][0-9];[^\x07\x1B]*(\x07|\x1B\\)/g, '')
     // Remover secuencias DCS, PM, APC
     .replace(/\x1B[PX^_][^\x1B]*\x1B\\/g, '')
-    // Remover caracteres de control C0 y C1
+    // Remover secuencias problemáticas específicas
+    .replace(/\\\)07=/g, '')
+    .replace(/\x1B\([0AB]\)/g, '')
+    .replace(/\x1B=/g, '')
+    .replace(/\x1B>/g, '')
+    // Remover caracteres de control C0 y C1 más agresivamente
     .replace(/[\x00-\x1F\x7F-\x9F]/g, (match) => {
       // Preservar solo algunos caracteres importantes
-      if (match === '\n' || match === '\r' || match === '\t') {
+      if (match === '\n' || match === '\r' || match === '\t' || match === ' ') {
         return match;
       }
       return '';
-    });
+    })
+    // Limpiar múltiples espacios y caracteres raros
+    .replace(/\s{3,}/g, '  ')
+    .replace(/[^\x20-\x7E\n\r\t]/g, '');
   
-  // Procesar solo códigos de color básicos que queremos mantener
+  // Convertir a formato más limpio para web
   let processed = cleaned
-    // Colores básicos de texto (30-37)
-    .replace(/\x1B\[30m/g, '<span style="color: #2d3748;">')  // Negro/Gris oscuro
-    .replace(/\x1B\[31m/g, '<span style="color: #e53e3e;">')  // Rojo
-    .replace(/\x1B\[32m/g, '<span style="color: #38a169;">')  // Verde
-    .replace(/\x1B\[33m/g, '<span style="color: #d69e2e;">')  // Amarillo
-    .replace(/\x1B\[34m/g, '<span style="color: #3182ce;">')  // Azul
-    .replace(/\x1B\[35m/g, '<span style="color: #a855f7;">')  // Magenta
-    .replace(/\x1B\[36m/g, '<span style="color: #0891b2;">')  // Cian
-    .replace(/\x1B\[37m/g, '<span style="color: #e2e8f0;">')  // Blanco
-    
-    // Colores brillantes (90-97)
-    .replace(/\x1B\[90m/g, '<span style="color: #4a5568;">')  // Gris brillante
-    .replace(/\x1B\[91m/g, '<span style="color: #fc8181;">')  // Rojo brillante
-    .replace(/\x1B\[92m/g, '<span style="color: #68d391;">')  // Verde brillante
-    .replace(/\x1B\[93m/g, '<span style="color: #f6e05e;">')  // Amarillo brillante
-    .replace(/\x1B\[94m/g, '<span style="color: #63b3ed;">')  // Azul brillante
-    .replace(/\x1B\[95m/g, '<span style="color: #b794f6;">')  // Magenta brillante
-    .replace(/\x1B\[96m/g, '<span style="color: #4fd1c7;">')  // Cian brillante
-    .replace(/\x1B\[97m/g, '<span style="color: #f7fafc;">')  // Blanco brillante
-    
-    // Estilos de texto
-    .replace(/\x1B\[1m/g, '<span style="font-weight: bold;">')    // Negrita
-    .replace(/\x1B\[2m/g, '<span style="opacity: 0.6;">')         // Tenue
-    .replace(/\x1B\[4m/g, '<span style="text-decoration: underline;">') // Subrayado
-    
-    // Reset y fin de formato
-    .replace(/\x1B\[0m/g, '</span>')  // Reset completo
-    .replace(/\x1B\[m/g, '</span>')   // Reset alternativo
-    
-    // Remover cualquier secuencia que haya quedado
-    .replace(/\x1B\[[0-9;]*m/g, '')
-    
     // Convertir espacios y saltos de línea para HTML
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
