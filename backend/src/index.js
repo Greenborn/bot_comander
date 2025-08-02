@@ -59,6 +59,62 @@ async function validateBotApiKey(username, apiKey) {
   }
 }
 
+// Función para inicializar el frontend según el modo configurado
+async function initializeFrontend() {
+  const serveMode = process.env.SERVE_FRONTEND_MODE || 'development';
+  
+  if (serveMode === 'development') {
+    console.log('🔧 Modo desarrollo: frontend servido desde Vite dev server');
+    console.log('💡 Asegúrate de ejecutar "npm run dev" en el directorio frontend');
+    console.log('📱 Panel de control disponible en: http://localhost:5173 (Vite dev server)');
+    
+    // En modo desarrollo, configurar proxy hacia el dev server de Vite
+    setupDevelopmentProxy();
+  } else {
+    console.log('🏗️ Modo producción: construyendo frontend...');
+    await buildFrontend();
+    setupProductionStatic();
+  }
+}
+
+// Configurar proxy para modo desarrollo
+function setupDevelopmentProxy() {
+  // Middleware para redirigir al dev server de Vite en desarrollo
+  app.get('/', (req, res) => {
+    res.redirect('http://localhost:5173');
+  });
+  
+  // Servir archivos de la API pero redirigir todo lo demás a Vite
+  app.get('*', (req, res, next) => {
+    // Si es una ruta de API, continuar normalmente
+    if (req.path.startsWith('/api')) {
+      next();
+      return;
+    }
+    
+    // Para cualquier otra ruta, redirigir a Vite dev server
+    res.redirect(`http://localhost:5173${req.path}`);
+  });
+}
+
+// Configurar servido estático para producción
+function setupProductionStatic() {
+  // Servir archivos estáticos del frontend construido
+  const frontendDistPath = path.resolve(__dirname, '../../frontend/dist');
+  app.use(express.static(frontendDistPath));
+  
+  // Servir el index.html para rutas no API
+  app.get('*', (req, res) => {
+    // Si es una ruta de API, no servir index.html
+    if (req.path.startsWith('/api')) {
+      res.status(404).json({ error: 'Endpoint no encontrado' });
+      return;
+    }
+    
+    res.sendFile(path.resolve(frontendDistPath, 'index.html'));
+  });
+}
+
 // Función para construir el frontend
 function buildFrontend() {
   return new Promise((resolve, reject) => {
@@ -114,10 +170,6 @@ function buildFrontend() {
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
-
-// Servir archivos estáticos del frontend construido
-const frontendDistPath = path.resolve(__dirname, '../../frontend/dist');
-app.use(express.static(frontendDistPath));
 
 // Middleware para parsear JSON
 app.use(express.json());
@@ -525,24 +577,23 @@ app.get('/api/bots', authenticateToken, (req, res) => {
   });
 });
 
-// Catch-all handler: enviar index.html para todas las rutas no API
-app.get('*', (req, res) => {
-  res.sendFile(path.resolve(frontendDistPath, 'index.html'));
-});
-
 const HOST = process.env.API_HOST || '0.0.0.0';
 const PORT = process.env.API_PORT || 3000;
 
 // Función para iniciar el servidor
 async function startServer() {
   try {
-    // Construir el frontend antes de iniciar el servidor
-    await buildFrontend();
+    // Inicializar el frontend según el modo configurado
+    await initializeFrontend();
     
     // Iniciar el servidor
     server.listen(PORT, HOST, () => {
-      console.log(`🚀 Servidor escuchando en http://${HOST}:${PORT}`);
-      console.log(`📱 Panel de control disponible en: http://${HOST}:${PORT}`);
+      console.log(`🚀 Servidor API escuchando en http://${HOST}:${PORT}`);
+      
+      const serveMode = process.env.SERVE_FRONTEND_MODE || 'development';
+      if (serveMode === 'production') {
+        console.log(`📱 Panel de control disponible en: http://${HOST}:${PORT}`);
+      }
     });
   } catch (error) {
     console.error('💥 Error al iniciar el servidor:', error.message);

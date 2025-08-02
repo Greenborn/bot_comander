@@ -235,15 +235,6 @@
                               <i class="bi bi-terminal"></i>
                               Consola
                             </button>
-                            <button 
-                              class="btn btn-sm btn-outline-info"
-                              @click="openTerminal(bot)"
-                              data-bs-toggle="modal" 
-                              data-bs-target="#terminalModal"
-                            >
-                              <i class="bi bi-window-desktop"></i>
-                              Terminal
-                            </button>
                           </div>
                         </div>
                       </div>
@@ -310,182 +301,79 @@
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body p-0">
-            <div class="console-container" style="height: 400px; background-color: #0d1117;">
-              <div class="console-output p-3" style="height: 350px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 14px;">
-                <div v-for="(line, index) in consoleOutput" :key="index" class="console-line">
-                  <span :class="line.type === 'command' ? 'text-info' : line.type === 'error' ? 'text-danger' : 'text-light'">
-                    {{ line.text }}
-                  </span>
-                </div>
-                <div v-if="consoleOutput.length === 0" class="text-muted">
-                  Consola lista. Escribe un comando y presiona Enter.
-                </div>
-              </div>
-              <div class="console-input border-top border-secondary p-2" style="background-color: #161b22;">
-                <div class="input-group">
-                  <span class="input-group-text bg-dark text-info border-secondary">
-                    {{ selectedBot?.botName || 'bot' }}@system:~$
-                  </span>
-                  <input 
-                    type="text" 
-                    class="form-control bg-dark text-light border-secondary console-input-field"
-                    placeholder="Escribe un comando..."
-                    v-model="currentCommand"
-                    @keyup.enter="executeCommand"
-                    :disabled="commandExecuting"
-                    ref="consoleInput"
-                  >
-                  <button 
-                    class="btn btn-outline-success" 
-                    @click="executeCommand"
-                    :disabled="commandExecuting || !currentCommand.trim()"
-                  >
-                    <span v-if="commandExecuting" class="spinner-border spinner-border-sm me-1"></span>
-                    <i v-else class="bi bi-play-fill"></i>
-                    {{ commandExecuting ? 'Ejecutando...' : 'Ejecutar' }}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="modal-footer border-secondary">
-            <button type="button" class="btn btn-outline-secondary" @click="clearConsole">
-              <i class="bi bi-trash"></i>
-              Limpiar
-            </button>
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-              Cerrar
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Terminal PTY Modal -->
-    <div class="modal fade" id="terminalModal" tabindex="-1" aria-labelledby="terminalModalLabel" aria-hidden="true">
-      <div class="modal-dialog modal-xl">
-        <div class="modal-content bg-dark text-light">
-          <div class="modal-header border-secondary">
-            <h5 class="modal-title" id="terminalModalLabel">
-              <i class="bi bi-window-desktop"></i>
-              Terminal Interactivo - {{ selectedBot?.botName || 'Bot' }}
-              <span v-if="terminalSessionId" class="badge bg-success ms-2">{{ terminalSessionId.slice(-8) }}</span>
-            </h5>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body p-0">
-            <div class="terminal-container" style="height: 500px; background-color: #0d1117;">
-              <!-- Terminal Toolbar -->
-              <div class="terminal-toolbar bg-secondary p-2 d-flex justify-content-between align-items-center">
-                <div class="d-flex gap-2">
-                  <button 
-                    class="btn btn-sm btn-success" 
-                    @click="startTerminalSession"
-                    :disabled="terminalConnected"
-                  >
-                    <i class="bi bi-play-fill"></i>
-                    {{ terminalConnected ? 'Conectado' : 'Conectar' }}
-                  </button>
-                  <button 
-                    class="btn btn-sm btn-warning" 
-                    @click="killTerminalSession"
-                    :disabled="!terminalConnected"
-                  >
-                    <i class="bi bi-stop-fill"></i>
-                    Desconectar
-                  </button>
-                  <button 
-                    class="btn btn-sm btn-outline-light" 
-                    @click="clearTerminal"
-                  >
-                    <i class="bi bi-trash"></i>
-                    Limpiar
-                  </button>
-                  <button 
-                    class="btn btn-sm btn-outline-info" 
-                    @click="toggleRawMode"
-                    :class="{ 'btn-info': terminalRawMode, 'btn-outline-info': !terminalRawMode }"
-                  >
-                    <i class="bi bi-code"></i>
-                    {{ terminalRawMode ? 'Normal' : 'Raw' }}
-                  </button>
-                </div>
-                <div class="d-flex gap-2 align-items-center">
-                  <small class="text-light">Tamaño:</small>
-                  <input 
-                    type="number" 
-                    class="form-control form-control-sm" 
-                    style="width: 70px;" 
-                    v-model="terminalCols" 
-                    min="40" 
-                    max="200"
-                    @change="resizeTerminal"
-                  >
-                  <small class="text-light">x</small>
-                  <input 
-                    type="number" 
-                    class="form-control form-control-sm" 
-                    style="width: 70px;" 
-                    v-model="terminalRows" 
-                    min="10" 
-                    max="50"
-                    @change="resizeTerminal"
-                  >
-                </div>
-              </div>
-              
-              <!-- Terminal Output -->
+            <div class="terminal-container" style="height: 400px; background-color: #0d1117;">
               <div 
                 class="terminal-output p-3" 
-                :style="{
-                  height: '400px', 
-                  overflowY: 'auto', 
-                  fontFamily: 'Courier New, monospace', 
-                  fontSize: '14px',
-                  lineHeight: '1.2'
-                }"
+                style="height: 350px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 14px; white-space: pre-wrap;"
                 ref="terminalOutput"
               >
-                <div v-if="terminalLines.length === 0 && !terminalConnected" class="text-muted">
-                  Terminal interactivo. Haz clic en "Conectar" para iniciar una sesión.
-                </div>
-                <div v-else-if="terminalLines.length === 0 && terminalConnected" class="text-info">
-                  Iniciando sesión de terminal...
-                </div>
-                <div v-for="(line, index) in terminalLines" :key="index" class="terminal-line">
-                  <span class="text-light" v-html="formatTerminalOutput(line.data)"></span>
+                <div v-for="(line, index) in terminalLines" :key="index" v-html="formatTerminalOutput(line.data || line)"></div>
+                <div v-if="terminalLines.length === 0" class="text-muted">
+                  Terminal listo. Conectando...
                 </div>
               </div>
-              
-              <!-- Terminal Input -->
               <div class="terminal-input border-top border-secondary p-2" style="background-color: #161b22;">
                 <div class="input-group">
                   <span class="input-group-text bg-dark text-success border-secondary">
-                    <i class="bi bi-chevron-right"></i>
+                    <i class="bi bi-terminal"></i>
+                    {{ terminalConnected ? 'Conectado' : 'Desconectado' }}
                   </span>
                   <input 
                     type="text" 
                     class="form-control bg-dark text-light border-secondary terminal-input-field"
-                    placeholder="Escribe comandos directamente..."
-                    v-model="terminalInput"
+                    placeholder="Escribe en la terminal..."
                     @keydown="handleTerminalKeydown"
-                    @keyup.enter="sendTerminalCommand"
                     :disabled="!terminalConnected"
-                    ref="terminalInputField"
+                    ref="terminalInput"
                   >
+                  <button 
+                    class="btn btn-outline-success" 
+                    @click="startTerminalSession"
+                    v-if="!terminalConnected"
+                  >
+                    <i class="bi bi-play-circle"></i>
+                    Conectar
+                  </button>
+                  <button 
+                    class="btn btn-outline-danger" 
+                    @click="stopTerminalSession"
+                    v-else
+                  >
+                    <i class="bi bi-stop-circle"></i>
+                    Desconectar
+                  </button>
                 </div>
-                <small class="text-muted mt-1 d-block">
-                  Usa Enter para nueva línea, Ctrl+C para interrumpir, Ctrl+D para EOF
-                </small>
               </div>
             </div>
           </div>
           <div class="modal-footer border-secondary">
-            <button type="button" class="btn btn-outline-info" @click="listTerminalSessions">
-              <i class="bi bi-list"></i>
-              Listar Sesiones
+            <button type="button" class="btn btn-outline-warning" @click="clearTerminal">
+              <i class="bi bi-trash"></i>
+              Limpiar Terminal
             </button>
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" @click="disconnectTerminal">
+            <div class="btn-group">
+              <button 
+                type="button" 
+                class="btn btn-outline-info" 
+                @click="sendTerminalCommand('clear')"
+                :disabled="!terminalConnected"
+                title="Limpiar pantalla"
+              >
+                <i class="bi bi-eraser"></i>
+                Clear
+              </button>
+              <button 
+                type="button" 
+                class="btn btn-outline-info" 
+                @click="sendTerminalCommand('exit')"
+                :disabled="!terminalConnected"
+                title="Salir"
+              >
+                <i class="bi bi-box-arrow-right"></i>
+                Exit
+              </button>
+            </div>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
               Cerrar
             </button>
           </div>
@@ -521,7 +409,7 @@ const currentCommand = ref('');
 const commandExecuting = ref(false);
 const consoleInput = ref(null);
 
-// Terminal PTY related variables
+// PTY Terminal variables (para el modal de consola)
 const terminalSessionId = ref(null);
 const terminalConnected = ref(false);
 const terminalLines = ref([]);
@@ -680,12 +568,17 @@ function initializeWebSocket() {
   };
 }
 
-// Console functions
+// Console functions - ahora con PTY
 function openConsole(bot) {
   selectedBot.value = bot;
-  consoleOutput.value = [];
-  currentCommand.value = '';
-  commandExecuting.value = false;
+  commandHistory.value = [];
+  commandInput.value = '';
+  
+  // Inicializar PTY
+  terminalSessionId.value = null;
+  terminalConnected.value = false;
+  terminalLines.value = [];
+  terminalInput.value = '';
   
   // Focus input after modal is shown
   setTimeout(() => {
@@ -693,6 +586,211 @@ function openConsole(bot) {
       consoleInput.value.focus();
     }
   }, 500);
+}
+
+// PTY functions para el modal de consola
+function startTerminalSession() {
+  if (!selectedBot.value || terminalConnected.value) return;
+  
+  const requestId = `pty_req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: 'pty_start',
+      targetBot: selectedBot.value.id,
+      requestId: requestId,
+      interactive: true,
+      cols: terminalCols.value,
+      rows: terminalRows.value
+    }));
+  }
+}
+
+function killTerminalSession() {
+  if (!terminalSessionId.value || !terminalConnected.value) return;
+  
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: 'pty_kill',
+      targetBot: selectedBot.value.id,
+      sessionId: terminalSessionId.value,
+      signal: 'SIGTERM'
+    }));
+  }
+}
+
+function resizeTerminal() {
+  if (!terminalSessionId.value || !terminalConnected.value) return;
+  
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: 'pty_resize',
+      targetBot: selectedBot.value.id,
+      sessionId: terminalSessionId.value,
+      cols: terminalCols.value,
+      rows: terminalRows.value
+    }));
+  }
+}
+
+function handleTerminalKeydown(event) {
+  if (!terminalConnected.value || !terminalSessionId.value) return;
+  
+  let data = '';
+  
+  // Solo manejar teclas especiales, NO enviar caracteres normales
+  if (event.key === 'Enter') {
+    // El Enter se maneja en sendTerminalCommand
+    return;
+  } else if (event.ctrlKey && event.key === 'c') {
+    data = '\x03'; // Ctrl+C
+    event.preventDefault();
+  } else if (event.ctrlKey && event.key === 'd') {
+    data = '\x04'; // Ctrl+D (EOF)
+    event.preventDefault();
+  } else if (event.key === 'Tab') {
+    data = '\t';
+    event.preventDefault();
+  } else if (event.key === 'ArrowUp') {
+    data = '\x1b[A';
+    event.preventDefault();
+  } else if (event.key === 'ArrowDown') {
+    data = '\x1b[B';
+    event.preventDefault();
+  } else if (event.key === 'ArrowRight') {
+    data = '\x1b[C';
+    event.preventDefault();
+  } else if (event.key === 'ArrowLeft') {
+    data = '\x1b[D';
+    event.preventDefault();
+  }
+  
+  if (data && ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: 'pty_input',
+      targetBot: selectedBot.value.id,
+      sessionId: terminalSessionId.value,
+      data: data
+    }));
+  }
+}
+
+function clearTerminal() {
+  terminalLines.value = [];
+}
+
+function toggleRawMode() {
+  terminalRawMode.value = !terminalRawMode.value;
+}
+
+function sendTerminalCommand() {
+  if (!terminalConnected.value || !terminalSessionId.value || !terminalInput.value.trim()) return;
+  
+  // Enviar el comando completo al bot
+  const command = terminalInput.value + '\r';
+  
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: 'pty_input',
+      targetBot: selectedBot.value.id,
+      sessionId: terminalSessionId.value,
+      data: command
+    }));
+  }
+  
+  // Limpiar el input
+  terminalInput.value = '';
+  scrollTerminalToBottom();
+}
+
+function listTerminalSessions() {
+  if (!selectedBot.value) return;
+  
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: 'pty_list',
+      targetBot: selectedBot.value.id
+    }));
+  }
+}
+
+function disconnectTerminal() {
+  if (terminalConnected.value && terminalSessionId.value) {
+    killTerminalSession();
+  }
+}
+
+function handlePtyMessage(data) {
+  switch (data.type) {
+    case 'pty_started':
+      terminalSessionId.value = data.sessionId;
+      terminalConnected.value = true;
+      terminalLines.value.push({
+        data: `\x1b[32m[Sesión iniciada: ${data.sessionId}]\x1b[0m\r\n`,
+        timestamp: new Date()
+      });
+      scrollTerminalToBottom();
+      
+      // Focus terminal input
+      setTimeout(() => {
+        if (terminalInputField.value) {
+          terminalInputField.value.focus();
+        }
+      }, 100);
+      break;
+      
+    case 'pty_output':
+      if (data.sessionId === terminalSessionId.value) {
+        let processedData = data.data;
+        
+        // Limitar número de líneas para performance
+        if (terminalLines.value.length > 50) {
+          terminalLines.value = terminalLines.value.slice(-20);
+        }
+        
+        terminalLines.value.push({
+          data: processedData,
+          timestamp: new Date()
+        });
+        scrollTerminalToBottom();
+      }
+      break;
+      
+    case 'pty_session_ended':
+      if (data.sessionId === terminalSessionId.value) {
+        terminalConnected.value = false;
+        terminalLines.value.push({
+          data: `\x1b[31m[Sesión terminada: código ${data.exitCode}]\x1b[0m\r\n`,
+          timestamp: new Date()
+        });
+        scrollTerminalToBottom();
+        terminalSessionId.value = null;
+      }
+      break;
+      
+    case 'pty_sessions_list':
+      const sessions = data.sessions || [];
+      terminalLines.value.push({
+        data: `\x1b[36m[Sesiones activas: ${sessions.length}]\x1b[0m\r\n`,
+        timestamp: new Date()
+      });
+      sessions.forEach(session => {
+        terminalLines.value.push({
+          data: `\x1b[36m- ${session.sessionId}: ${session.command} (${Math.floor(session.uptime/1000)}s)\x1b[0m\r\n`,
+          timestamp: new Date()
+        });
+      });
+      scrollTerminalToBottom();
+      break;
+      
+    case 'pty_error':
+      terminalLines.value.push({
+        data: `\x1b[31m[Error: ${data.error}]\x1b[0m\r\n`,
+        timestamp: new Date()
+      });
+      scrollTerminalToBottom();
+      break;
+  }
 }
 
 function executeCommand() {
@@ -780,253 +878,13 @@ function scrollConsoleToBottom() {
   }, 50);
 }
 
-// Terminal PTY functions
-function openTerminal(bot) {
-  selectedBot.value = bot;
-  terminalSessionId.value = null;
-  terminalConnected.value = false;
-  terminalLines.value = [];
-  terminalInput.value = '';
-  
-  // Focus input after modal is shown
-  setTimeout(() => {
-    if (terminalInputField.value) {
-      terminalInputField.value.focus();
-    }
-  }, 500);
-}
-
-function startTerminalSession() {
-  if (!selectedBot.value || terminalConnected.value) return;
-  
-  const requestId = `pty_req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({
-      type: 'pty_start',
-      targetBot: selectedBot.value.id,
-      requestId: requestId,
-      interactive: true,
-      cols: terminalCols.value,
-      rows: terminalRows.value
-    }));
-  }
-}
-
-function killTerminalSession() {
-  if (!terminalSessionId.value || !terminalConnected.value) return;
-  
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({
-      type: 'pty_kill',
-      targetBot: selectedBot.value.id,
-      sessionId: terminalSessionId.value,
-      signal: 'SIGTERM'
-    }));
-  }
-}
-
-function resizeTerminal() {
-  if (!terminalSessionId.value || !terminalConnected.value) return;
-  
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({
-      type: 'pty_resize',
-      targetBot: selectedBot.value.id,
-      sessionId: terminalSessionId.value,
-      cols: terminalCols.value,
-      rows: terminalRows.value
-    }));
-  }
-}
-
-function handleTerminalKeydown(event) {
-  if (!terminalConnected.value || !terminalSessionId.value) return;
-  
-  let data = '';
-  
-  // Solo manejar teclas especiales, NO enviar caracteres normales
-  if (event.key === 'Enter') {
-    // El Enter se maneja en sendTerminalCommand
-    return;
-  } else if (event.ctrlKey && event.key === 'c') {
-    data = '\x03'; // Ctrl+C
-    event.preventDefault();
-  } else if (event.ctrlKey && event.key === 'd') {
-    data = '\x04'; // Ctrl+D (EOF)
-    event.preventDefault();
-  } else if (event.key === 'Tab') {
-    data = '\t';
-    event.preventDefault();
-  } else if (event.key === 'ArrowUp') {
-    data = '\x1b[A';
-    event.preventDefault();
-  } else if (event.key === 'ArrowDown') {
-    data = '\x1b[B';
-    event.preventDefault();
-  } else if (event.key === 'ArrowRight') {
-    data = '\x1b[C';
-    event.preventDefault();
-  } else if (event.key === 'ArrowLeft') {
-    data = '\x1b[D';
-    event.preventDefault();
-  }
-  // NO enviar caracteres normales ni backspace aquí
-  
-  if (data && ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({
-      type: 'pty_input',
-      targetBot: selectedBot.value.id,
-      sessionId: terminalSessionId.value,
-      data: data
-    }));
-  }
-}
-
-function clearTerminal() {
-  terminalLines.value = [];
-}
-
-function toggleRawMode() {
-  terminalRawMode.value = !terminalRawMode.value;
-}
-
-function sendTerminalCommand() {
-  if (!terminalConnected.value || !terminalSessionId.value || !terminalInput.value.trim()) return;
-  
-  // Enviar el comando completo al bot (sin mostrar manualmente)
-  const command = terminalInput.value + '\r';
-  
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({
-      type: 'pty_input',
-      targetBot: selectedBot.value.id,
-      sessionId: terminalSessionId.value,
-      data: command
-    }));
-  }
-  
-  // Limpiar el input
-  terminalInput.value = '';
-  scrollTerminalToBottom();
-}
-
-function listTerminalSessions() {
-  if (!selectedBot.value) return;
-  
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({
-      type: 'pty_list',
-      targetBot: selectedBot.value.id
-    }));
-  }
-}
-
-function disconnectTerminal() {
-  if (terminalConnected.value && terminalSessionId.value) {
-    killTerminalSession();
-  }
-}
-
-function handlePtyMessage(data) {
-  switch (data.type) {
-    case 'pty_started':
-      terminalSessionId.value = data.sessionId;
-      terminalConnected.value = true;
-      terminalLines.value.push({
-        data: `\x1b[32m[Sesión iniciada: ${data.sessionId}]\x1b[0m\r\n`,
-        timestamp: new Date()
-      });
-      scrollTerminalToBottom();
-      
-      // Focus terminal input
-      setTimeout(() => {
-        if (terminalInputField.value) {
-          terminalInputField.value.focus();
-        }
-      }, 100);
-      break;
-      
-    case 'pty_output':
-      if (data.sessionId === terminalSessionId.value) {
-        // Para aplicaciones interactivas como htop, implementar estrategia más agresiva
-        let processedData = data.data;
-        
-        // Si hay demasiadas líneas, limpiar más agresivamente
-        if (terminalLines.value.length > 50) {
-          terminalLines.value = terminalLines.value.slice(-20);
-        }
-        
-        // Para htop y aplicaciones similares, combinar datos más agresivamente
-        if (processedData.length < 200 && terminalLines.value.length > 0) {
-          const lastLine = terminalLines.value[terminalLines.value.length - 1];
-          const timeDiff = new Date() - lastLine.timestamp;
-          
-          // Si es muy reciente (menos de 200ms), combinarlo
-          if (timeDiff < 200) {
-            lastLine.data += processedData;
-            lastLine.timestamp = new Date();
-            
-            // Si la línea combinada es muy larga, crear nueva línea
-            if (lastLine.data.length > 1000) {
-              terminalLines.value.push({
-                data: processedData,
-                timestamp: new Date()
-              });
-            }
-            
-            scrollTerminalToBottom();
-            break;
-          }
-        }
-        
-        terminalLines.value.push({
-          data: processedData,
-          timestamp: new Date()
-        });
-        scrollTerminalToBottom();
-      }
-      break;
-      
-    case 'pty_session_ended':
-      if (data.sessionId === terminalSessionId.value) {
-        terminalConnected.value = false;
-        terminalLines.value.push({
-          data: `\x1b[31m[Sesión terminada: código ${data.exitCode}]\x1b[0m\r\n`,
-          timestamp: new Date()
-        });
-        scrollTerminalToBottom();
-        terminalSessionId.value = null;
-      }
-      break;
-      
-    case 'pty_sessions_list':
-      const sessions = data.sessions || [];
-      terminalLines.value.push({
-        data: `\x1b[36m[Sesiones activas: ${sessions.length}]\x1b[0m\r\n`,
-        timestamp: new Date()
-      });
-      sessions.forEach(session => {
-        terminalLines.value.push({
-          data: `\x1b[36m- ${session.sessionId}: ${session.command} (${Math.floor(session.uptime/1000)}s)\x1b[0m\r\n`,
-          timestamp: new Date()
-        });
-      });
-      scrollTerminalToBottom();
-      break;
-      
-    case 'pty_error':
-      terminalLines.value.push({
-        data: `\x1b[31m[Error: ${data.error}]\x1b[0m\r\n`,
-        timestamp: new Date()
-      });
-      scrollTerminalToBottom();
-      break;
-  }
-}
-
 function formatTerminalOutput(data) {
+  // Validar que data sea una cadena de texto
   if (!data) return '';
+  if (typeof data !== 'string') {
+    // Si no es cadena, convertir a string
+    data = String(data);
+  }
   
   // Si está en modo raw, mostrar todo con mínimo procesamiento
   if (terminalRawMode.value) {
@@ -1046,28 +904,41 @@ function formatTerminalOutput(data) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
   
-  // Remover códigos ANSI problemáticos pero preservar códigos de color
+  // Limpiar secuencias problemáticas ANTES de procesar colores
   let cleaned = escaped
-    // Remover secuencias de título de ventana y comandos OSC
-    .replace(/\x1B\][0-9];[^\x07\x1B]*(\x07|\x1B\\)/g, '')
-    // Remover secuencias DCS, PM, APC
-    .replace(/\x1B[PX^_][^\x1B]*\x1B\\/g, '')
-    // Remover secuencias problemáticas específicas (las que causan texto raro)
-    .replace(/\\\)07=/g, '')
+    // Remover secuencias problemáticas específicas que vimos
+    .replace(/\)07/g, '')
+    .replace(/\\\)07=/g, '') 
     .replace(/\x1B\([0AB]\)/g, '')
     .replace(/\x1B=/g, '')
     .replace(/\x1B>/g, '')
-    // Remover caracteres de control problemáticos pero preservar importantes
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+    .replace(/\x1B\[?\d*[lh]/g, '') // modos del terminal
+    .replace(/\x1B\[\?[\d;]*[lh]/g, '') // modos del terminal con parámetros
+    .replace(/\x1B\[\d*[rR]/g, '') // configurar región de scroll
+    .replace(/\x1B\[\d+;\d+r/g, '') // configurar región de scroll con parámetros
+    .replace(/\x1B\]\d+;[^\x07\x1B]*(\x07|\x1B\\)/g, '') // comandos OSC
+    .replace(/\x1B[PX^_][^\x1B]*\x1B\\/g, '') // secuencias DCS, PM, APC
+    // Remover códigos de control de cursor complejos
+    .replace(/\x1B\[\?\d+h/g, '') // activar modos
+    .replace(/\x1B\[\?\d+l/g, '') // desactivar modos
+    .replace(/\x1B\[[\d;]*[HfF]/g, '') // posición absoluta de cursor
+    .replace(/\x1B\[\d*[ABCD]/g, '') // movimiento relativo de cursor
+    .replace(/\x1B\[\d*[JK]/g, '') // borrar línea/pantalla
+    .replace(/\x1B\[2J/g, '') // limpiar pantalla completa
+    .replace(/\x1B\[H/g, '') // cursor al inicio
+    .replace(/\x1B\[0?m/g, '</span>') // reset como cierre de span
+    // Remover otros caracteres de control problemáticos
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+    // Limpiar códigos específicos que siguen apareciendo
+    .replace(/\[32m\[Sesión iniciada:[^\]]*\]/g, '<span style="color: #0DBC79;">[Sesión iniciada]</span>')
+    .replace(/\[01;32m/g, '<span style="color: #23D18B; font-weight: bold;">')
+    .replace(/\[00m/g, '</span>')
+    .replace(/\[01;34m/g, '<span style="color: #3B8EEA; font-weight: bold;">');
   
-  // Convertir códigos de color ANSI a HTML con estilos CSS
+  // Procesar SOLO códigos de color y estilos básicos
   let withColors = cleaned
-    // Reset/normal (0m)
-    .replace(/\x1B\[0m/g, '</span>')
-    .replace(/\x1B\[m/g, '</span>')
-    
-    // Colores de texto (30-37)
-    .replace(/\x1B\[30m/g, '<span style="color: #000000;">') // negro
+    // Colores de texto estándar (30-37)
+    .replace(/\x1B\[30m/g, '<span style="color: #666666;">') // negro -> gris oscuro
     .replace(/\x1B\[31m/g, '<span style="color: #CD3131;">') // rojo
     .replace(/\x1B\[32m/g, '<span style="color: #0DBC79;">') // verde
     .replace(/\x1B\[33m/g, '<span style="color: #E5E510;">') // amarillo
@@ -1077,7 +948,7 @@ function formatTerminalOutput(data) {
     .replace(/\x1B\[37m/g, '<span style="color: #E5E5E5;">') // blanco
     
     // Colores brillantes (90-97)
-    .replace(/\x1B\[90m/g, '<span style="color: #666666;">') // gris
+    .replace(/\x1B\[90m/g, '<span style="color: #888888;">') // gris
     .replace(/\x1B\[91m/g, '<span style="color: #F14C4C;">') // rojo brillante
     .replace(/\x1B\[92m/g, '<span style="color: #23D18B;">') // verde brillante
     .replace(/\x1B\[93m/g, '<span style="color: #F5F543;">') // amarillo brillante
@@ -1086,45 +957,46 @@ function formatTerminalOutput(data) {
     .replace(/\x1B\[96m/g, '<span style="color: #29B8DB;">') // cyan brillante
     .replace(/\x1B\[97m/g, '<span style="color: #FFFFFF;">') // blanco brillante
     
-    // Colores de fondo (40-47)
-    .replace(/\x1B\[40m/g, '<span style="background-color: #000000;">') // fondo negro
-    .replace(/\x1B\[41m/g, '<span style="background-color: #CD3131;">') // fondo rojo
-    .replace(/\x1B\[42m/g, '<span style="background-color: #0DBC79;">') // fondo verde
-    .replace(/\x1B\[43m/g, '<span style="background-color: #E5E510;">') // fondo amarillo
-    .replace(/\x1B\[44m/g, '<span style="background-color: #2472C8;">') // fondo azul
-    .replace(/\x1B\[45m/g, '<span style="background-color: #BC3FBC;">') // fondo magenta
-    .replace(/\x1B\[46m/g, '<span style="background-color: #11A8CD;">') // fondo cyan
-    .replace(/\x1B\[47m/g, '<span style="background-color: #E5E5E5;">') // fondo blanco
-    
-    // Estilos de texto
+    // Estilos de texto básicos
     .replace(/\x1B\[1m/g, '<span style="font-weight: bold;">') // negrita
-    .replace(/\x1B\[2m/g, '<span style="opacity: 0.5;">') // dim
-    .replace(/\x1B\[3m/g, '<span style="font-style: italic;">') // cursiva
+    .replace(/\x1B\[2m/g, '<span style="opacity: 0.6;">') // dim
     .replace(/\x1B\[4m/g, '<span style="text-decoration: underline;">') // subrayado
     
-    // Códigos combinados más comunes
+    // Códigos combinados comunes (negrita + color)
+    .replace(/\x1B\[1;30m/g, '<span style="color: #888888; font-weight: bold;">') // negro negrita
     .replace(/\x1B\[1;31m/g, '<span style="color: #F14C4C; font-weight: bold;">') // rojo negrita
     .replace(/\x1B\[1;32m/g, '<span style="color: #23D18B; font-weight: bold;">') // verde negrita
     .replace(/\x1B\[1;33m/g, '<span style="color: #F5F543; font-weight: bold;">') // amarillo negrita
     .replace(/\x1B\[1;34m/g, '<span style="color: #3B8EEA; font-weight: bold;">') // azul negrita
     .replace(/\x1B\[1;35m/g, '<span style="color: #D670D6; font-weight: bold;">') // magenta negrita
     .replace(/\x1B\[1;36m/g, '<span style="color: #29B8DB; font-weight: bold;">') // cyan negrita
-    .replace(/\x1B\[1;37m/g, '<span style="color: #FFFFFF; font-weight: bold;">') // blanco negrita;
+    .replace(/\x1B\[1;37m/g, '<span style="color: #FFFFFF; font-weight: bold;">') // blanco negrita
+    
+    // Códigos dim + color
+    .replace(/\x1B\[2;30m/g, '<span style="color: #444444; opacity: 0.6;">') // negro dim
+    .replace(/\x1B\[2;31m/g, '<span style="color: #CD3131; opacity: 0.6;">') // rojo dim
+    .replace(/\x1B\[2;32m/g, '<span style="color: #0DBC79; opacity: 0.6;">') // verde dim
+    .replace(/\x1B\[2;33m/g, '<span style="color: #E5E510; opacity: 0.6;">') // amarillo dim
+    .replace(/\x1B\[2;34m/g, '<span style="color: #2472C8; opacity: 0.6;">') // azul dim
+    .replace(/\x1B\[2;35m/g, '<span style="color: #BC3FBC; opacity: 0.6;">') // magenta dim
+    .replace(/\x1B\[2;36m/g, '<span style="color: #11A8CD; opacity: 0.6;">') // cyan dim
+    .replace(/\x1B\[2;37m/g, '<span style="color: #E5E5E5; opacity: 0.6;">'); // blanco dim
   
-  // Remover códigos de cursor y otros códigos de control que no procesamos
+  // ÚLTIMA LIMPIEZA: remover cualquier secuencia ANSI que quede
   let finalCleaned = withColors
-    .replace(/\x1B\[[ABCD]/g, '') // movimientos de cursor básicos
-    .replace(/\x1B\[[0-9]+[ABCD]/g, '') // movimientos de cursor con número
-    .replace(/\x1B\[[HfF]/g, '') // posición de cursor
-    .replace(/\x1B\[[0-9;]*[HfF]/g, '') // posición de cursor con coordenadas
-    .replace(/\x1B\[[JK]/g, '') // borrar línea/pantalla
-    .replace(/\x1B\[[0-9]*[JK]/g, '') // borrar línea/pantalla con parámetros
-    .replace(/\x1B\[[?][0-9;]*[lh]/g, '') // modo del terminal
-    .replace(/\x1B\[[0-9;]*[lh]/g, '') // configuraciones del terminal
-    .replace(/\x1B\[2J/g, '') // limpiar pantalla
-    .replace(/\x1B\[H/g, ''); // ir al inicio
+    .replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '') // cualquier secuencia ANSI restante
+    .replace(/\x1B\[[?!>][0-9;]*[a-zA-Z]/g, '') // secuencias con prefijos especiales
+    .replace(/\x1B[^[]./g, '') // secuencias que no empiecen con [
+    .replace(/\x1B/g, '') // cualquier ESC restante
+    // Limpiar códigos específicos remanentes sin el caracter de escape
+    .replace(/\[32m/g, '<span style="color: #0DBC79;">')
+    .replace(/\[01;32m/g, '<span style="color: #23D18B; font-weight: bold;">')
+    .replace(/\[00m/g, '</span>')
+    .replace(/\[01;34m/g, '<span style="color: #3B8EEA; font-weight: bold;">')
+    .replace(/\[\d+;\d+m/g, '') // cualquier código de color restante
+    .replace(/\[\d+m/g, ''); // cualquier código simple restante
   
-  // Convertir saltos de línea y espacios para HTML
+  // Convertir espacios y saltos de línea para HTML
   let processed = finalCleaned
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')

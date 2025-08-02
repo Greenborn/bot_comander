@@ -45,7 +45,58 @@ npm run setup-auth
 
 Este script te pedirá un usuario y contraseña para acceder al panel de control. La contraseña se almacenará de forma segura como hash en el archivo `.env`.
 
-### 4. Ejecutar en Desarrollo
+### 4. Modos de Ejecución
+
+Bot Commander soporta dos modos de ejecución configurables:
+
+#### Modo Desarrollo (Por Defecto)
+En modo desarrollo, el frontend se sirve desde el servidor de desarrollo Vite con hot reload:
+
+```bash
+# Instalar dependencias del proyecto raíz (incluye concurrently)
+npm install
+
+# Ejecutar frontend y backend en paralelo
+npm run dev
+```
+
+O manualmente:
+```bash
+# Terminal 1: Backend
+npm run dev:backend
+
+# Terminal 2: Frontend  
+npm run dev:frontend
+```
+
+**Configuración en .env:**
+```bash
+SERVE_FRONTEND_MODE=development
+```
+
+#### Modo Producción
+En modo producción, el frontend se construye y se sirve como archivos estáticos:
+
+```bash
+# Construir y ejecutar en modo producción
+npm run start:production
+```
+
+O configurar en `.env` y ejecutar:
+```bash
+SERVE_FRONTEND_MODE=production
+npm run start
+```
+
+**Configuración en .env:**
+```bash
+SERVE_FRONTEND_MODE=production
+```
+
+### 5. Ejecutar Manualmente (Modo Legacy)
+
+Si prefieres ejecutar cada componente por separado:
+
 ```bash
 # Backend (en una terminal)
 cd backend
