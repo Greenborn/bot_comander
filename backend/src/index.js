@@ -339,6 +339,92 @@ wss.on('connection', (ws, req) => {
           });
       }
       
+      // Manejar solicitudes de terminal PTY desde paneles hacia bots
+      if (message.type === 'pty_start' && clients[clientId].type === 'panel') {
+        const targetBot = message.targetBot;
+        
+        if (clients[targetBot] && clients[targetBot].type === 'bot') {
+          clients[targetBot].ws.send(JSON.stringify({
+            type: 'pty_start',
+            requestId: message.requestId,
+            command: message.command,
+            interactive: message.interactive || false,
+            cols: message.cols || 80,
+            rows: message.rows || 24,
+            from: 'panel'
+          }));
+        } else {
+          ws.send(JSON.stringify({
+            type: 'pty_error',
+            requestId: message.requestId,
+            error: 'Bot no encontrado o no disponible'
+          }));
+        }
+      }
+      
+      // Manejar entrada PTY desde paneles hacia bots
+      if (message.type === 'pty_input' && clients[clientId].type === 'panel') {
+        const targetBot = message.targetBot;
+        
+        if (clients[targetBot] && clients[targetBot].type === 'bot') {
+          clients[targetBot].ws.send(JSON.stringify({
+            type: 'pty_input',
+            sessionId: message.sessionId,
+            data: message.data
+          }));
+        }
+      }
+      
+      // Manejar redimensionamiento PTY desde paneles hacia bots
+      if (message.type === 'pty_resize' && clients[clientId].type === 'panel') {
+        const targetBot = message.targetBot;
+        
+        if (clients[targetBot] && clients[targetBot].type === 'bot') {
+          clients[targetBot].ws.send(JSON.stringify({
+            type: 'pty_resize',
+            sessionId: message.sessionId,
+            cols: message.cols,
+            rows: message.rows
+          }));
+        }
+      }
+      
+      // Manejar terminación PTY desde paneles hacia bots
+      if (message.type === 'pty_kill' && clients[clientId].type === 'panel') {
+        const targetBot = message.targetBot;
+        
+        if (clients[targetBot] && clients[targetBot].type === 'bot') {
+          clients[targetBot].ws.send(JSON.stringify({
+            type: 'pty_kill',
+            sessionId: message.sessionId,
+            signal: message.signal || 'SIGTERM'
+          }));
+        }
+      }
+      
+      // Manejar lista de sesiones PTY desde paneles hacia bots
+      if (message.type === 'pty_list' && clients[clientId].type === 'panel') {
+        const targetBot = message.targetBot;
+        
+        if (clients[targetBot] && clients[targetBot].type === 'bot') {
+          clients[targetBot].ws.send(JSON.stringify({
+            type: 'pty_list',
+            requestId: message.requestId || `list_${Date.now()}`
+          }));
+        }
+      }
+      
+      // Reenviar respuestas PTY desde bots hacia paneles
+      if (clients[clientId].type === 'bot' && message.type?.startsWith('pty_')) {
+        Object.values(clients)
+          .filter(client => client.type === 'panel')
+          .forEach(({ ws }) => {
+            if (ws.readyState === ws.OPEN) {
+              ws.send(JSON.stringify(message));
+            }
+          });
+      }
+      
     } catch (e) {
       console.error('Error parsing message:', e);
     }

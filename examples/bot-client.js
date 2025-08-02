@@ -34,6 +34,10 @@ class BotClient {
     this.isConnected = false;
     this.isAuthenticated = false;
     
+    // PTY sessions management
+    this.ptySessions = new Map();
+    this.sessionCounter = 0;
+    
     this.setupActions();
   }
 
@@ -149,6 +153,26 @@ class BotClient {
           
         case 'system_command':
           this.handleSystemCommand(message);
+          break;
+          
+        case 'pty_start':
+          this.handlePtyStart(message);
+          break;
+          
+        case 'pty_input':
+          this.handlePtyInput(message);
+          break;
+          
+        case 'pty_resize':
+          this.handlePtyResize(message);
+          break;
+          
+        case 'pty_kill':
+          this.handlePtyKill(message);
+          break;
+          
+        case 'pty_list':
+          this.handlePtyList(message);
           break;
           
         default:
@@ -300,6 +324,215 @@ class BotClient {
         exitCode: -1
       });
     }
+  }
+
+  /**
+   * Manejador para iniciar sesión PTY
+   */
+  async handlePtyStart(message) {
+    const { requestId, command, interactive, cols, rows } = message;
+    
+    try {
+      const { spawn } = require('child_process');
+      
+      // Crear ID único para la sesión
+      this.sessionCounter++;
+      const sessionId = `pty_${Date.now()}_${this.sessionCounter}`;
+      
+      console.log(`[${this.config.botName}] 🖥️  Iniciando sesión PTY: ${command || 'shell'} (${sessionId})`);
+      
+      // Determinar shell y argumentos según el sistema operativo
+      const isWindows = process.platform === 'win32';
+      let shell, shellArgs;
+      
+      if (command) {
+        shell = isWindows ? 'cmd' : 'bash';
+        shellArgs = isWindows ? ['/c', command] : ['-c', command];
+      } else {
+        // Shell interactivo por defecto
+        shell = isWindows ? 'cmd' : 'bash';
+        shellArgs = isWindows ? [] : ['--login'];
+      }
+      
+      // Crear proceso hijo
+      const childProcess = spawn(shell, shellArgs, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        shell: false,
+        env: {
+          ...process.env,
+          TERM: 'xterm-256color',
+          COLUMNS: cols?.toString() || '80',
+          LINES: rows?.toString() || '24'
+        }
+      });
+      
+      // Almacenar información de la sesión
+      const sessionInfo = {
+        sessionId,
+        requestId,
+        command: command || 'interactive shell',
+        process: childProcess,
+        createdAt: Date.now(),
+        interactive: interactive || false,
+        cols: cols || 80,
+        rows: rows || 24
+      };
+      
+      this.ptySessions.set(sessionId, sessionInfo);
+      
+      // Configurar manejadores del proceso
+      childProcess.stdout.on('data', (data) => {
+        this.send({
+          type: 'pty_output',
+          sessionId,
+          requestId,
+          data: data.toString(),
+          timestamp: Date.now()
+        });
+      });
+      
+      childProcess.stderr.on('data', (data) => {
+        this.send({
+          type: 'pty_output',
+          sessionId,
+          requestId,
+          data: data.toString(),
+          timestamp: Date.now()
+        });
+      });
+      
+      childProcess.on('close', (code, signal) => {
+        this.send({
+          type: 'pty_session_ended',
+          sessionId,
+          requestId,
+          command: sessionInfo.command,
+          success: code === 0,
+          exitCode: code,
+          signal: signal,
+          duration: Date.now() - sessionInfo.createdAt
+        });
+        
+        this.ptySessions.delete(sessionId);
+        console.log(`[${this.config.botName}] 🔚 Sesión PTY terminada: ${sessionId}`);
+      });
+      
+      childProcess.on('error', (error) => {
+        this.send({
+          type: 'pty_session_ended',
+          sessionId,
+          requestId,
+          command: sessionInfo.command,
+          success: false,
+          error: error.message,
+          exitCode: -1,
+          duration: Date.now() - sessionInfo.createdAt
+        });
+        
+        this.ptySessions.delete(sessionId);
+        console.error(`[${this.config.botName}] ❌ Error en sesión PTY ${sessionId}:`, error);
+      });
+      
+      // Confirmar que la sesión se inició exitosamente
+      this.send({
+        type: 'pty_started',
+        requestId,
+        sessionId,
+        command: sessionInfo.command,
+        success: true,
+        timestamp: Date.now()
+      });
+      
+    } catch (error) {
+      console.error(`[${this.config.botName}] ❌ Error iniciando PTY:`, error);
+      this.send({
+        type: 'pty_error',
+        requestId,
+        error: `Error iniciando sesión PTY: ${error.message}`
+      });
+    }
+  }
+
+  /**
+   * Manejador para entrada PTY
+   */
+  handlePtyInput(message) {
+    const { sessionId, data } = message;
+    const session = this.ptySessions.get(sessionId);
+    
+    if (session && session.process && !session.process.killed) {
+      try {
+        session.process.stdin.write(data);
+      } catch (error) {
+        console.error(`[${this.config.botName}] ❌ Error enviando entrada a PTY ${sessionId}:`, error);
+      }
+    }
+  }
+
+  /**
+   * Manejador para redimensionar PTY
+   */
+  handlePtyResize(message) {
+    const { sessionId, cols, rows } = message;
+    const session = this.ptySessions.get(sessionId);
+    
+    if (session) {
+      session.cols = cols;
+      session.rows = rows;
+      
+      // Actualizar variables de entorno si es posible
+      if (session.process && !session.process.killed) {
+        try {
+          // En sistemas Unix, podríamos enviar SIGWINCH, pero por simplicidad
+          // solo actualizamos las variables de la sesión
+          console.log(`[${this.config.botName}] 📏 PTY ${sessionId} redimensionado a ${cols}x${rows}`);
+        } catch (error) {
+          console.error(`[${this.config.botName}] ❌ Error redimensionando PTY ${sessionId}:`, error);
+        }
+      }
+    }
+  }
+
+  /**
+   * Manejador para terminar sesión PTY
+   */
+  handlePtyKill(message) {
+    const { sessionId, signal } = message;
+    const session = this.ptySessions.get(sessionId);
+    
+    if (session && session.process && !session.process.killed) {
+      try {
+        const killSignal = signal || 'SIGTERM';
+        session.process.kill(killSignal);
+        console.log(`[${this.config.botName}] ⚡ Terminando PTY ${sessionId} con señal ${killSignal}`);
+      } catch (error) {
+        console.error(`[${this.config.botName}] ❌ Error terminando PTY ${sessionId}:`, error);
+      }
+    }
+  }
+
+  /**
+   * Manejador para listar sesiones PTY
+   */
+  handlePtyList(message) {
+    const { requestId } = message;
+    
+    const sessions = Array.from(this.ptySessions.entries()).map(([sessionId, session]) => ({
+      sessionId,
+      requestId: session.requestId,
+      command: session.command,
+      createdAt: session.createdAt,
+      uptime: Date.now() - session.createdAt
+    }));
+    
+    this.send({
+      type: 'pty_sessions_list',
+      sessions,
+      total: sessions.length,
+      timestamp: Date.now()
+    });
+    
+    console.log(`[${this.config.botName}] 📋 Listando ${sessions.length} sesiones PTY activas`);
   }
 
   /**
@@ -549,6 +782,14 @@ class BotClient {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
     }
+    
+    // Cerrar todas las sesiones PTY activas
+    this.ptySessions.forEach((session, sessionId) => {
+      if (session.process && !session.process.killed) {
+        session.process.kill('SIGTERM');
+      }
+    });
+    this.ptySessions.clear();
     
     if (this.ws) {
       this.ws.close();
