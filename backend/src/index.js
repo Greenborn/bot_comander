@@ -297,6 +297,48 @@ wss.on('connection', (ws, req) => {
         }
       }
       
+      // Manejar comandos del sistema desde paneles hacia bots
+      if (message.type === 'system_command' && clients[clientId].type === 'panel') {
+        const targetBot = message.targetBot;
+        const command = message.command;
+        
+        if (clients[targetBot] && clients[targetBot].type === 'bot') {
+          clients[targetBot].ws.send(JSON.stringify({
+            type: 'system_command',
+            command: command,
+            from: 'panel',
+            requestId: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+          }));
+        } else {
+          // Bot no encontrado, enviar error al panel
+          ws.send(JSON.stringify({
+            type: 'command_response',
+            success: false,
+            error: 'Bot no encontrado o no disponible'
+          }));
+        }
+      }
+      
+      // Manejar respuestas de comandos del sistema desde bots
+      if (message.type === 'system_command_response' && clients[clientId].type === 'bot') {
+        // Reenviar la respuesta a todos los paneles conectados
+        Object.values(clients)
+          .filter(client => client.type === 'panel')
+          .forEach(({ ws }) => {
+            if (ws.readyState === ws.OPEN) {
+              ws.send(JSON.stringify({
+                type: 'command_response',
+                success: message.success,
+                output: message.output,
+                error: message.error,
+                command: message.command,
+                botId: clientId,
+                requestId: message.requestId
+              }));
+            }
+          });
+      }
+      
     } catch (e) {
       console.error('Error parsing message:', e);
     }

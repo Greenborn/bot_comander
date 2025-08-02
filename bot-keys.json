@@ -5,5 +5,12 @@
     "createdAt": "2025-08-01T05:26:18.183Z",
     "lastUpdated": "2025-08-01T05:26:18.183Z",
     "isActive": true
+  },
+  "test1": {
+    "username": "test1",
+    "apiKeyHash": "$2b$12$EpGz/btgLzlPyRtj1qpu4u/gdP7LW/ihoqQShCljVjI8P2QP8LCkm",
+    "createdAt": "2025-08-02T03:48:38.409Z",
+    "lastUpdated": "2025-08-02T03:48:38.409Z",
+    "isActive": true
   }
 }

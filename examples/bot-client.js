@@ -147,6 +147,10 @@ class BotClient {
           // Confirmación de heartbeat recibida
           break;
           
+        case 'system_command':
+          this.handleSystemCommand(message);
+          break;
+          
         default:
           console.warn(`[${this.config.botName}] Tipo de mensaje desconocido:`, message.type);
       }
@@ -217,6 +221,84 @@ class BotClient {
       
       // No reintentar para errores de autenticación
       process.exit(1);
+    }
+  }
+
+  /**
+   * Manejador de comandos del sistema
+   */
+  async handleSystemCommand(message) {
+    const { command, requestId } = message;
+    
+    console.log(`[${this.config.botName}] 🖥️  Ejecutando comando del sistema: ${command}`);
+    
+    try {
+      const { spawn } = require('child_process');
+      
+      // Determinar shell y argumentos según el sistema operativo
+      const isWindows = process.platform === 'win32';
+      const shell = isWindows ? 'cmd' : 'bash';
+      const shellArgs = isWindows ? ['/c'] : ['-c'];
+      
+      const childProcess = spawn(shell, [...shellArgs, command], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        shell: false
+      });
+      
+      let output = '';
+      let errorOutput = '';
+      
+      childProcess.stdout.on('data', (data) => {
+        output += data.toString();
+      });
+      
+      childProcess.stderr.on('data', (data) => {
+        errorOutput += data.toString();
+      });
+      
+      childProcess.on('close', (code) => {
+        // Enviar respuesta de vuelta al servidor
+        this.send({
+          type: 'system_command_response',
+          requestId: requestId,
+          command: command,
+          success: code === 0,
+          output: output || null,
+          error: errorOutput || null,
+          exitCode: code
+        });
+        
+        if (code === 0) {
+          console.log(`[${this.config.botName}] ✅ Comando ejecutado exitosamente`);
+        } else {
+          console.log(`[${this.config.botName}] ❌ Comando falló con código: ${code}`);
+        }
+      });
+      
+      childProcess.on('error', (error) => {
+        console.error(`[${this.config.botName}] ❌ Error ejecutando comando:`, error);
+        this.send({
+          type: 'system_command_response',
+          requestId: requestId,
+          command: command,
+          success: false,
+          output: null,
+          error: `Error ejecutando comando: ${error.message}`,
+          exitCode: -1
+        });
+      });
+      
+    } catch (error) {
+      console.error(`[${this.config.botName}] ❌ Error en handleSystemCommand:`, error);
+      this.send({
+        type: 'system_command_response',
+        requestId: requestId,
+        command: command,
+        success: false,
+        output: null,
+        error: `Error interno: ${error.message}`,
+        exitCode: -1
+      });
     }
   }
 

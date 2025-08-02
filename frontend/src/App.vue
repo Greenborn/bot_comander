@@ -226,6 +226,15 @@
                               <i class="bi bi-gear"></i>
                               Comandos
                             </button>
+                            <button 
+                              class="btn btn-sm btn-outline-success"
+                              @click="openConsole(bot)"
+                              data-bs-toggle="modal" 
+                              data-bs-target="#consoleModal"
+                            >
+                              <i class="bi bi-terminal"></i>
+                              Consola
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -279,6 +288,69 @@
       </div>
     </div>
     </div>
+
+    <!-- Console Modal -->
+    <div class="modal fade" id="consoleModal" tabindex="-1" aria-labelledby="consoleModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark text-light">
+          <div class="modal-header border-secondary">
+            <h5 class="modal-title" id="consoleModalLabel">
+              <i class="bi bi-terminal"></i>
+              Consola - {{ selectedBot?.botName || 'Bot' }}
+            </h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body p-0">
+            <div class="console-container" style="height: 400px; background-color: #0d1117;">
+              <div class="console-output p-3" style="height: 350px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 14px;">
+                <div v-for="(line, index) in consoleOutput" :key="index" class="console-line">
+                  <span :class="line.type === 'command' ? 'text-info' : line.type === 'error' ? 'text-danger' : 'text-light'">
+                    {{ line.text }}
+                  </span>
+                </div>
+                <div v-if="consoleOutput.length === 0" class="text-muted">
+                  Consola lista. Escribe un comando y presiona Enter.
+                </div>
+              </div>
+              <div class="console-input border-top border-secondary p-2" style="background-color: #161b22;">
+                <div class="input-group">
+                  <span class="input-group-text bg-dark text-info border-secondary">
+                    {{ selectedBot?.botName || 'bot' }}@system:~$
+                  </span>
+                  <input 
+                    type="text" 
+                    class="form-control bg-dark text-light border-secondary console-input-field"
+                    placeholder="Escribe un comando..."
+                    v-model="currentCommand"
+                    @keyup.enter="executeCommand"
+                    :disabled="commandExecuting"
+                    ref="consoleInput"
+                  >
+                  <button 
+                    class="btn btn-outline-success" 
+                    @click="executeCommand"
+                    :disabled="commandExecuting || !currentCommand.trim()"
+                  >
+                    <span v-if="commandExecuting" class="spinner-border spinner-border-sm me-1"></span>
+                    <i v-else class="bi bi-play-fill"></i>
+                    {{ commandExecuting ? 'Ejecutando...' : 'Ejecutar' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer border-secondary">
+            <button type="button" class="btn btn-outline-secondary" @click="clearConsole">
+              <i class="bi bi-trash"></i>
+              Limpiar
+            </button>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+              Cerrar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -300,6 +372,13 @@ const loginForm = ref({
   username: '',
   password: ''
 });
+
+// Console related variables
+const selectedBot = ref(null);
+const consoleOutput = ref([]);
+const currentCommand = ref('');
+const commandExecuting = ref(false);
+const consoleInput = ref(null);
 
 let ws;
 let authToken = '';
@@ -433,10 +512,115 @@ function initializeWebSocket() {
         console.log('Bienvenida:', data.message);
       }
       
+      // Manejar respuesta de comando de consola
+      if (data.type === 'command_response') {
+        handleCommandResponse(data);
+      }
+      
     } catch (e) {
       console.error('Error parseando mensaje:', e);
     }
   };
+}
+
+// Console functions
+function openConsole(bot) {
+  selectedBot.value = bot;
+  consoleOutput.value = [];
+  currentCommand.value = '';
+  commandExecuting.value = false;
+  
+  // Focus input after modal is shown
+  setTimeout(() => {
+    if (consoleInput.value) {
+      consoleInput.value.focus();
+    }
+  }, 500);
+}
+
+function executeCommand() {
+  if (!currentCommand.value.trim() || commandExecuting.value || !selectedBot.value) {
+    return;
+  }
+  
+  const command = currentCommand.value.trim();
+  
+  // Add command to output
+  consoleOutput.value.push({
+    type: 'command',
+    text: `${selectedBot.value.botName}@system:~$ ${command}`,
+    timestamp: new Date()
+  });
+  
+  // Send command to bot
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: 'system_command',
+      targetBot: selectedBot.value.id,
+      command: command,
+      from: 'panel'
+    }));
+    
+    commandExecuting.value = true;
+    currentCommand.value = '';
+    
+    // Scroll to bottom
+    scrollConsoleToBottom();
+  } else {
+    consoleOutput.value.push({
+      type: 'error',
+      text: 'Error: No hay conexión WebSocket',
+      timestamp: new Date()
+    });
+  }
+}
+
+function handleCommandResponse(data) {
+  if (data.success) {
+    if (data.output) {
+      consoleOutput.value.push({
+        type: 'output',
+        text: data.output,
+        timestamp: new Date()
+      });
+    }
+    if (data.error) {
+      consoleOutput.value.push({
+        type: 'error',
+        text: data.error,
+        timestamp: new Date()
+      });
+    }
+  } else {
+    consoleOutput.value.push({
+      type: 'error',
+      text: data.error || 'Error ejecutando comando',
+      timestamp: new Date()
+    });
+  }
+  
+  commandExecuting.value = false;
+  scrollConsoleToBottom();
+  
+  // Focus input again
+  setTimeout(() => {
+    if (consoleInput.value) {
+      consoleInput.value.focus();
+    }
+  }, 100);
+}
+
+function clearConsole() {
+  consoleOutput.value = [];
+}
+
+function scrollConsoleToBottom() {
+  setTimeout(() => {
+    const consoleOutputEl = document.querySelector('.console-output');
+    if (consoleOutputEl) {
+      consoleOutputEl.scrollTop = consoleOutputEl.scrollHeight;
+    }
+  }, 50);
 }
 
 onUnmounted(() => {
@@ -483,5 +667,56 @@ code {
   padding: 2px 6px;
   border-radius: 4px;
   background-color: rgba(0,123,255,0.1);
+}
+
+/* Console styles */
+.console-container {
+  border: 1px solid #30363d;
+  border-radius: 6px;
+}
+
+.console-output {
+  background-color: #0d1117 !important;
+}
+
+.console-line {
+  margin-bottom: 2px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.console-input-field {
+  background-color: #161b22 !important;
+  border-color: #30363d !important;
+  color: #f0f6fc !important;
+}
+
+.console-input-field:focus {
+  background-color: #161b22 !important;
+  border-color: #58a6ff !important;
+  color: #f0f6fc !important;
+  box-shadow: 0 0 0 0.25rem rgba(88, 166, 255, 0.25);
+}
+
+.console-input-field::placeholder {
+  color: #7d8590;
+}
+
+/* Custom scrollbar for console */
+.console-output::-webkit-scrollbar {
+  width: 8px;
+}
+
+.console-output::-webkit-scrollbar-track {
+  background: #21262d;
+}
+
+.console-output::-webkit-scrollbar-thumb {
+  background: #30363d;
+  border-radius: 4px;
+}
+
+.console-output::-webkit-scrollbar-thumb:hover {
+  background: #484f58;
 }
 </style>
