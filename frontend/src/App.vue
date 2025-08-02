@@ -1040,41 +1040,97 @@ function formatTerminalOutput(data) {
       .replace(/ /g, '&nbsp;');
   }
   
-  // Función más agresiva para limpiar códigos ANSI problemáticos
-  let cleaned = data
-    // Remover TODAS las secuencias de escape complejas
-    .replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '')
-    // Remover secuencias con parámetros opcionales
-    .replace(/\x1B\[[?!>][0-9;]*[a-zA-Z]/g, '')
+  // Primero escapar caracteres HTML
+  let escaped = data
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  
+  // Remover códigos ANSI problemáticos pero preservar códigos de color
+  let cleaned = escaped
     // Remover secuencias de título de ventana y comandos OSC
     .replace(/\x1B\][0-9];[^\x07\x1B]*(\x07|\x1B\\)/g, '')
     // Remover secuencias DCS, PM, APC
     .replace(/\x1B[PX^_][^\x1B]*\x1B\\/g, '')
-    // Remover secuencias problemáticas específicas
+    // Remover secuencias problemáticas específicas (las que causan texto raro)
     .replace(/\\\)07=/g, '')
     .replace(/\x1B\([0AB]\)/g, '')
     .replace(/\x1B=/g, '')
     .replace(/\x1B>/g, '')
-    // Remover caracteres de control C0 y C1 más agresivamente
-    .replace(/[\x00-\x1F\x7F-\x9F]/g, (match) => {
-      // Preservar solo algunos caracteres importantes
-      if (match === '\n' || match === '\r' || match === '\t' || match === ' ') {
-        return match;
-      }
-      return '';
-    })
-    // Limpiar múltiples espacios y caracteres raros
-    .replace(/\s{3,}/g, '  ')
-    .replace(/[^\x20-\x7E\n\r\t]/g, '');
+    // Remover caracteres de control problemáticos pero preservar importantes
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
   
-  // Convertir a formato más limpio para web
-  let processed = cleaned
-    // Convertir espacios y saltos de línea para HTML
+  // Convertir códigos de color ANSI a HTML con estilos CSS
+  let withColors = cleaned
+    // Reset/normal (0m)
+    .replace(/\x1B\[0m/g, '</span>')
+    .replace(/\x1B\[m/g, '</span>')
+    
+    // Colores de texto (30-37)
+    .replace(/\x1B\[30m/g, '<span style="color: #000000;">') // negro
+    .replace(/\x1B\[31m/g, '<span style="color: #CD3131;">') // rojo
+    .replace(/\x1B\[32m/g, '<span style="color: #0DBC79;">') // verde
+    .replace(/\x1B\[33m/g, '<span style="color: #E5E510;">') // amarillo
+    .replace(/\x1B\[34m/g, '<span style="color: #2472C8;">') // azul
+    .replace(/\x1B\[35m/g, '<span style="color: #BC3FBC;">') // magenta
+    .replace(/\x1B\[36m/g, '<span style="color: #11A8CD;">') // cyan
+    .replace(/\x1B\[37m/g, '<span style="color: #E5E5E5;">') // blanco
+    
+    // Colores brillantes (90-97)
+    .replace(/\x1B\[90m/g, '<span style="color: #666666;">') // gris
+    .replace(/\x1B\[91m/g, '<span style="color: #F14C4C;">') // rojo brillante
+    .replace(/\x1B\[92m/g, '<span style="color: #23D18B;">') // verde brillante
+    .replace(/\x1B\[93m/g, '<span style="color: #F5F543;">') // amarillo brillante
+    .replace(/\x1B\[94m/g, '<span style="color: #3B8EEA;">') // azul brillante
+    .replace(/\x1B\[95m/g, '<span style="color: #D670D6;">') // magenta brillante
+    .replace(/\x1B\[96m/g, '<span style="color: #29B8DB;">') // cyan brillante
+    .replace(/\x1B\[97m/g, '<span style="color: #FFFFFF;">') // blanco brillante
+    
+    // Colores de fondo (40-47)
+    .replace(/\x1B\[40m/g, '<span style="background-color: #000000;">') // fondo negro
+    .replace(/\x1B\[41m/g, '<span style="background-color: #CD3131;">') // fondo rojo
+    .replace(/\x1B\[42m/g, '<span style="background-color: #0DBC79;">') // fondo verde
+    .replace(/\x1B\[43m/g, '<span style="background-color: #E5E510;">') // fondo amarillo
+    .replace(/\x1B\[44m/g, '<span style="background-color: #2472C8;">') // fondo azul
+    .replace(/\x1B\[45m/g, '<span style="background-color: #BC3FBC;">') // fondo magenta
+    .replace(/\x1B\[46m/g, '<span style="background-color: #11A8CD;">') // fondo cyan
+    .replace(/\x1B\[47m/g, '<span style="background-color: #E5E5E5;">') // fondo blanco
+    
+    // Estilos de texto
+    .replace(/\x1B\[1m/g, '<span style="font-weight: bold;">') // negrita
+    .replace(/\x1B\[2m/g, '<span style="opacity: 0.5;">') // dim
+    .replace(/\x1B\[3m/g, '<span style="font-style: italic;">') // cursiva
+    .replace(/\x1B\[4m/g, '<span style="text-decoration: underline;">') // subrayado
+    
+    // Códigos combinados más comunes
+    .replace(/\x1B\[1;31m/g, '<span style="color: #F14C4C; font-weight: bold;">') // rojo negrita
+    .replace(/\x1B\[1;32m/g, '<span style="color: #23D18B; font-weight: bold;">') // verde negrita
+    .replace(/\x1B\[1;33m/g, '<span style="color: #F5F543; font-weight: bold;">') // amarillo negrita
+    .replace(/\x1B\[1;34m/g, '<span style="color: #3B8EEA; font-weight: bold;">') // azul negrita
+    .replace(/\x1B\[1;35m/g, '<span style="color: #D670D6; font-weight: bold;">') // magenta negrita
+    .replace(/\x1B\[1;36m/g, '<span style="color: #29B8DB; font-weight: bold;">') // cyan negrita
+    .replace(/\x1B\[1;37m/g, '<span style="color: #FFFFFF; font-weight: bold;">') // blanco negrita;
+  
+  // Remover códigos de cursor y otros códigos de control que no procesamos
+  let finalCleaned = withColors
+    .replace(/\x1B\[[ABCD]/g, '') // movimientos de cursor básicos
+    .replace(/\x1B\[[0-9]+[ABCD]/g, '') // movimientos de cursor con número
+    .replace(/\x1B\[[HfF]/g, '') // posición de cursor
+    .replace(/\x1B\[[0-9;]*[HfF]/g, '') // posición de cursor con coordenadas
+    .replace(/\x1B\[[JK]/g, '') // borrar línea/pantalla
+    .replace(/\x1B\[[0-9]*[JK]/g, '') // borrar línea/pantalla con parámetros
+    .replace(/\x1B\[[?][0-9;]*[lh]/g, '') // modo del terminal
+    .replace(/\x1B\[[0-9;]*[lh]/g, '') // configuraciones del terminal
+    .replace(/\x1B\[2J/g, '') // limpiar pantalla
+    .replace(/\x1B\[H/g, ''); // ir al inicio
+  
+  // Convertir saltos de línea y espacios para HTML
+  let processed = finalCleaned
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
     .replace(/\n/g, '<br>')
     .replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;')
-    .replace(/  /g, '&nbsp;&nbsp;'); // Solo espacios dobles para preservar formato
+    .replace(/  /g, '&nbsp;&nbsp;');
   
   return processed;
 }
