@@ -453,14 +453,7 @@
                   Iniciando sesión de terminal...
                 </div>
                 <div v-for="(line, index) in terminalLines" :key="index" class="terminal-line">
-                  <span 
-                    :class="{
-                      'text-light': !line.isCommand,
-                      'text-success': line.isCommand,
-                      'fw-bold': line.isCommand
-                    }" 
-                    v-html="line.isCommand ? line.data : formatTerminalOutput(line.data)"
-                  ></span>
+                  <span class="text-light" v-html="formatTerminalOutput(line.data)"></span>
                 </div>
               </div>
               
@@ -901,14 +894,7 @@ function toggleRawMode() {
 function sendTerminalCommand() {
   if (!terminalConnected.value || !terminalSessionId.value || !terminalInput.value.trim()) return;
   
-  // Mostrar el comando en la vista del terminal
-  terminalLines.value.push({
-    data: `$ ${terminalInput.value}`,
-    timestamp: new Date(),
-    isCommand: true
-  });
-  
-  // Enviar el comando completo al bot
+  // Enviar el comando completo al bot (sin mostrar manualmente)
   const command = terminalInput.value + '\r';
   
   if (ws && ws.readyState === WebSocket.OPEN) {
