@@ -918,8 +918,29 @@ function handlePtyMessage(data) {
       
     case 'pty_output':
       if (data.sessionId === terminalSessionId.value) {
+        // Para aplicaciones interactivas como htop, vamos a limitar las líneas
+        // y limpiar la salida más agresivamente
+        let processedData = data.data;
+        
+        // Si hay demasiadas líneas, mantener solo las últimas 100
+        if (terminalLines.value.length > 100) {
+          terminalLines.value = terminalLines.value.slice(-50);
+        }
+        
+        // Para evitar spam de actualizaciones de htop, combinar datos pequeños
+        if (processedData.length < 50 && terminalLines.value.length > 0) {
+          // Si el último elemento es reciente (menos de 100ms), combinarlo
+          const lastLine = terminalLines.value[terminalLines.value.length - 1];
+          const timeDiff = new Date() - lastLine.timestamp;
+          if (timeDiff < 100) {
+            lastLine.data += processedData;
+            scrollTerminalToBottom();
+            break;
+          }
+        }
+        
         terminalLines.value.push({
-          data: data.data,
+          data: processedData,
           timestamp: new Date()
         });
         scrollTerminalToBottom();
@@ -964,21 +985,69 @@ function handlePtyMessage(data) {
 }
 
 function formatTerminalOutput(data) {
-  // Convertir secuencias de escape ANSI básicas a HTML
-  return data
-    .replace(/\x1b\[0m/g, '</span>') // Reset
-    .replace(/\x1b\[31m/g, '<span style="color: #ff6b6b;">') // Rojo
-    .replace(/\x1b\[32m/g, '<span style="color: #51cf66;">') // Verde
-    .replace(/\x1b\[33m/g, '<span style="color: #ffd43b;">') // Amarillo
-    .replace(/\x1b\[34m/g, '<span style="color: #339af0;">') // Azul
-    .replace(/\x1b\[35m/g, '<span style="color: #f783ac;">') // Magenta
-    .replace(/\x1b\[36m/g, '<span style="color: #22b8cf;">') // Cian
-    .replace(/\x1b\[37m/g, '<span style="color: #ced4da;">') // Blanco
-    .replace(/\r\n/g, '<br>')
+  if (!data) return '';
+  
+  // Función más agresiva para limpiar códigos ANSI problemáticos
+  let cleaned = data
+    // Remover TODAS las secuencias de escape complejas
+    .replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '')
+    // Remover secuencias con parámetros opcionales
+    .replace(/\x1B\[[?!>][0-9;]*[a-zA-Z]/g, '')
+    // Remover secuencias de título de ventana y comandos OSC
+    .replace(/\x1B\][0-9];[^\x07\x1B]*(\x07|\x1B\\)/g, '')
+    // Remover secuencias DCS, PM, APC
+    .replace(/\x1B[PX^_][^\x1B]*\x1B\\/g, '')
+    // Remover caracteres de control C0 y C1
+    .replace(/[\x00-\x1F\x7F-\x9F]/g, (match) => {
+      // Preservar solo algunos caracteres importantes
+      if (match === '\n' || match === '\r' || match === '\t') {
+        return match;
+      }
+      return '';
+    });
+  
+  // Procesar solo códigos de color básicos que queremos mantener
+  let processed = cleaned
+    // Colores básicos de texto (30-37)
+    .replace(/\x1B\[30m/g, '<span style="color: #2d3748;">')  // Negro/Gris oscuro
+    .replace(/\x1B\[31m/g, '<span style="color: #e53e3e;">')  // Rojo
+    .replace(/\x1B\[32m/g, '<span style="color: #38a169;">')  // Verde
+    .replace(/\x1B\[33m/g, '<span style="color: #d69e2e;">')  // Amarillo
+    .replace(/\x1B\[34m/g, '<span style="color: #3182ce;">')  // Azul
+    .replace(/\x1B\[35m/g, '<span style="color: #a855f7;">')  // Magenta
+    .replace(/\x1B\[36m/g, '<span style="color: #0891b2;">')  // Cian
+    .replace(/\x1B\[37m/g, '<span style="color: #e2e8f0;">')  // Blanco
+    
+    // Colores brillantes (90-97)
+    .replace(/\x1B\[90m/g, '<span style="color: #4a5568;">')  // Gris brillante
+    .replace(/\x1B\[91m/g, '<span style="color: #fc8181;">')  // Rojo brillante
+    .replace(/\x1B\[92m/g, '<span style="color: #68d391;">')  // Verde brillante
+    .replace(/\x1B\[93m/g, '<span style="color: #f6e05e;">')  // Amarillo brillante
+    .replace(/\x1B\[94m/g, '<span style="color: #63b3ed;">')  // Azul brillante
+    .replace(/\x1B\[95m/g, '<span style="color: #b794f6;">')  // Magenta brillante
+    .replace(/\x1B\[96m/g, '<span style="color: #4fd1c7;">')  // Cian brillante
+    .replace(/\x1B\[97m/g, '<span style="color: #f7fafc;">')  // Blanco brillante
+    
+    // Estilos de texto
+    .replace(/\x1B\[1m/g, '<span style="font-weight: bold;">')    // Negrita
+    .replace(/\x1B\[2m/g, '<span style="opacity: 0.6;">')         // Tenue
+    .replace(/\x1B\[4m/g, '<span style="text-decoration: underline;">') // Subrayado
+    
+    // Reset y fin de formato
+    .replace(/\x1B\[0m/g, '</span>')  // Reset completo
+    .replace(/\x1B\[m/g, '</span>')   // Reset alternativo
+    
+    // Remover cualquier secuencia que haya quedado
+    .replace(/\x1B\[[0-9;]*m/g, '')
+    
+    // Convertir espacios y saltos de línea para HTML
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
     .replace(/\n/g, '<br>')
-    .replace(/\r/g, '<br>')
     .replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;')
-    .replace(/ /g, '&nbsp;');
+    .replace(/  /g, '&nbsp;&nbsp;'); // Solo espacios dobles para preservar formato
+  
+  return processed;
 }
 
 function scrollTerminalToBottom() {
@@ -1098,13 +1167,23 @@ code {
 
 .terminal-output {
   background-color: #0d1117 !important;
-  font-family: 'Courier New', monospace !important;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
+  font-size: 13px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  max-height: 400px;
+  overflow-y: auto;
 }
 
 .terminal-line {
-  margin-bottom: 0;
+  margin-bottom: 1px;
   line-height: 1.2;
   white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  display: block;
+  max-width: 100%;
 }
 
 .terminal-input-field {
