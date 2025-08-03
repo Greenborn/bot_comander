@@ -433,7 +433,7 @@
   </div>
 
   <!-- Modal para Datos de Bot -->
-  <div class="modal fade" id="botDataModal" tabindex="-1" aria-labelledby="botDataModalLabel" aria-hidden="true">
+  <div v-if="selectedBot && !selectedDataFile" class="modal fade show" style="display: block; background: rgba(0,0,0,0.5);" tabindex="-1" aria-labelledby="botDataModalLabel" aria-modal="true" role="dialog">
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
         <div class="modal-header">
@@ -441,7 +441,7 @@
             <i class="bi bi-database"></i>
             Datos de {{ selectedBot?.botName || 'Bot' }}
           </h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          <button type="button" class="btn-close" @click="selectedBot = null" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           <div v-if="loadingBotData" class="text-center py-4">
@@ -496,14 +496,14 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+          <button type="button" class="btn btn-secondary" @click="selectedBot = null">Cerrar</button>
         </div>
       </div>
     </div>
   </div>
 
   <!-- Modal para Ver Contenido de Archivo de Datos -->
-  <div class="modal fade" id="dataFileModal" tabindex="-1" aria-labelledby="dataFileModalLabel" aria-hidden="true">
+  <div v-if="selectedDataFile" class="modal fade show" style="display: block; background: rgba(0,0,0,0.5);" tabindex="-1" aria-labelledby="dataFileModalLabel" aria-modal="true" role="dialog">
     <div class="modal-dialog modal-xl">
       <div class="modal-content">
         <div class="modal-header">
@@ -511,7 +511,7 @@
             <i class="bi bi-file-earmark-text"></i>
             {{ selectedDataFile?.file || 'Archivo de datos' }}
           </h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          <button type="button" class="btn-close" @click="selectedDataFile = null" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           <div v-if="loadingFileData" class="text-center py-4">
@@ -598,7 +598,7 @@
             <i class="bi bi-download"></i>
             Descargar JSON
           </button>
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+          <button type="button" class="btn btn-secondary" @click="selectedDataFile = null">Cerrar</button>
         </div>
       </div>
     </div>
@@ -1582,19 +1582,16 @@ async function loadBotDataFiles(botName) {
 }
 
 async function openDataFile(file) {
+  // Usar solo el sistema reactivo de Vue para mostrar los modales
   selectedDataFile.value = file;
   fileDataError.value = '';
   fileData.value = [];
   loadingFileData.value = true;
   dataViewMode.value = 'formatted';
-  
   try {
     const botName = selectedBot.value.username || selectedBot.value.botName;
     await loadFileData(botName, file.date);
-    
-    // Mostrar el modal de contenido de archivo
-    const dataFileModal = new bootstrap.Modal(document.getElementById('dataFileModal'));
-    dataFileModal.show();
+    // El modal de archivo se mostrará automáticamente por v-if
   } catch (error) {
     console.error('Error abriendo archivo:', error);
     fileDataError.value = 'Error al cargar el contenido del archivo';
