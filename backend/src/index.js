@@ -1,4 +1,57 @@
 // ...existing code...
+
+// Inicialización de Express
+
+// Importación dinámica de multer y configuración del endpoint ZIP
+(async () => {
+  let multer;
+  try {
+    multer = (await import('multer')).default;
+  } catch (e) {
+    console.error('No se pudo importar multer:', e);
+    return;
+  }
+  // Configuración de multer para archivos ZIP
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 20 * 1024 * 1024 }, // 20MB máx
+    fileFilter: (req, file, cb) => {
+      if (file.mimetype === 'application/zip' || file.originalname.endsWith('.zip')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Solo se permiten archivos .zip'));
+      }
+    }
+  });
+
+  // Endpoint para enviar ZIP a un bot (privado)
+  app.post('/api/send-zip', authenticateToken, upload.single('zip'), async (req, res) => {
+    try {
+      const botId = req.body.botId;
+      const file = req.file;
+      if (!botId || !file) {
+        return res.status(400).json({ error: 'Faltan parámetros botId o archivo ZIP.' });
+      }
+      if (!clients[botId] || clients[botId].type !== 'bot') {
+        return res.status(404).json({ error: 'Bot no encontrado o no disponible.' });
+      }
+      // Enviar archivo ZIP al bot por WebSocket (como base64)
+      const zipBase64 = file.buffer.toString('base64');
+      clients[botId].ws.send(JSON.stringify({
+        type: 'receive_zip',
+        filename: file.originalname,
+        size: file.size,
+        data: zipBase64,
+        from: 'panel'
+      }));
+      res.json({ success: true, message: 'Archivo ZIP enviado al bot.' });
+    } catch (error) {
+      console.error('Error enviando ZIP:', error);
+      res.status(500).json({ error: 'Error interno al enviar ZIP.' });
+    }
+  });
+})();
+// ...existing code...
 // ...existing code...
 import express from 'express';
 import http from 'http';
@@ -281,6 +334,45 @@ function buildFrontend() {
     if (!fs.existsSync(frontendPath)) {
       console.warn('⚠️ No se encontró el directorio del frontend, continuando sin build...');
       resolve();
+// Configuración de multer para archivos ZIP
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB máx
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/zip' || file.originalname.endsWith('.zip')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Solo se permiten archivos .zip'));
+    }
+  }
+});
+
+// Endpoint para enviar ZIP a un bot (privado)
+app.post('/api/send-zip', authenticateToken, upload.single('zip'), async (req, res) => {
+  try {
+    const botId = req.body.botId;
+    const file = req.file;
+    if (!botId || !file) {
+      return res.status(400).json({ error: 'Faltan parámetros botId o archivo ZIP.' });
+    }
+    if (!clients[botId] || clients[botId].type !== 'bot') {
+      return res.status(404).json({ error: 'Bot no encontrado o no disponible.' });
+    }
+    // Enviar archivo ZIP al bot por WebSocket (como base64)
+    const zipBase64 = file.buffer.toString('base64');
+    clients[botId].ws.send(JSON.stringify({
+      type: 'receive_zip',
+      filename: file.originalname,
+      size: file.size,
+      data: zipBase64,
+      from: 'panel'
+    }));
+    res.json({ success: true, message: 'Archivo ZIP enviado al bot.' });
+  } catch (error) {
+    console.error('Error enviando ZIP:', error);
+    res.status(500).json({ error: 'Error interno al enviar ZIP.' });
+  }
+});
       return;
     }
     
