@@ -322,9 +322,10 @@
                     type="text" 
                     class="form-control bg-dark text-light border-secondary terminal-input-field"
                     placeholder="Escribe en la terminal..."
+                    v-model="terminalInput"
                     @keydown="handleTerminalKeydown"
                     :disabled="!terminalConnected"
-                    ref="terminalInput"
+                    ref="terminalInputField"
                   >
                   <button 
                     class="btn btn-outline-success" 
@@ -636,9 +637,11 @@ function handleTerminalKeydown(event) {
   
   let data = '';
   
-  // Solo manejar teclas especiales, NO enviar caracteres normales
+  // Manejar teclas especiales
   if (event.key === 'Enter') {
-    // El Enter se maneja en sendTerminalCommand
+    // Enviar el comando cuando se presiona Enter
+    sendTerminalCommand();
+    event.preventDefault();
     return;
   } else if (event.ctrlKey && event.key === 'c') {
     data = '\x03'; // Ctrl+C
@@ -681,11 +684,19 @@ function toggleRawMode() {
   terminalRawMode.value = !terminalRawMode.value;
 }
 
-function sendTerminalCommand() {
-  if (!terminalConnected.value || !terminalSessionId.value || !terminalInput.value.trim()) return;
+function sendTerminalCommand(directCommand = null) {
+  if (!terminalConnected.value || !terminalSessionId.value) return;
   
-  // Enviar el comando completo al bot
-  const command = terminalInput.value + '\r';
+  // Usar comando directo o el valor del input
+  let command;
+  if (directCommand) {
+    command = directCommand + '\r';
+  } else {
+    if (!terminalInput.value.trim()) return;
+    command = terminalInput.value + '\r';
+    // Limpiar el input solo si se envía desde el input
+    terminalInput.value = '';
+  }
   
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({
@@ -695,9 +706,6 @@ function sendTerminalCommand() {
       data: command
     }));
   }
-  
-  // Limpiar el input
-  terminalInput.value = '';
   scrollTerminalToBottom();
 }
 
