@@ -230,8 +230,6 @@
                               class="btn btn-sm position-relative"
                               :class="hasActiveTerminalSession(bot) ? 'btn-success' : 'btn-outline-success'"
                               @click="openConsole(bot)"
-                              data-bs-toggle="modal" 
-                              data-bs-target="#consoleModal"
                             >
                               <i class="bi bi-terminal"></i>
                               Consola
@@ -246,11 +244,16 @@
                             <button 
                               class="btn btn-sm btn-outline-info"
                               @click="openBotDataModal(bot)"
-                              data-bs-toggle="modal" 
-                              data-bs-target="#botDataModal"
                             >
                               <i class="bi bi-database"></i>
                               Datos
+                            </button>
+                            <button 
+                              class="btn btn-sm btn-outline-success"
+                              @click="openSendZipModal(bot)"
+                            >
+                              <i class="bi bi-file-earmark-zip"></i>
+                              Enviar ZIP
                             </button>
                           </div>
                         </div>
@@ -502,107 +505,50 @@
     </div>
   </div>
 
-  <!-- Modal para Ver Contenido de Archivo de Datos -->
-  <div v-if="selectedDataFile" class="modal fade show" style="display: block; background: rgba(0,0,0,0.5);" tabindex="-1" aria-labelledby="dataFileModalLabel" aria-modal="true" role="dialog">
-    <div class="modal-dialog modal-xl">
+  <!-- Modal para Enviar ZIP -->
+  <div v-if="showSendZipModal" class="modal fade show" style="display: block; background: rgba(0,0,0,0.5);" tabindex="-1" aria-labelledby="sendZipModalLabel" aria-modal="true" role="dialog">
+    <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title" id="dataFileModalLabel">
-            <i class="bi bi-file-earmark-text"></i>
-            {{ selectedDataFile?.file || 'Archivo de datos' }}
+          <h5 class="modal-title" id="sendZipModalLabel">
+            <i class="bi bi-file-earmark-zip"></i>
+            Enviar archivo ZIP a {{ zipTargetBot?.botName || 'Bot' }}
           </h5>
-          <button type="button" class="btn-close" @click="selectedDataFile = null" aria-label="Close"></button>
+          <button type="button" class="btn-close" @click="closeSendZipModal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          <div v-if="loadingFileData" class="text-center py-4">
-            <div class="spinner-border text-primary" role="status">
-              <span class="visually-hidden">Cargando...</span>
+          <form @submit.prevent="handleSendZip">
+            <div class="mb-3">
+              <label for="zipFileInput" class="form-label">Selecciona un archivo .zip</label>
+              <input type="file" class="form-control" id="zipFileInput" accept=".zip" @change="onZipFileChange" :disabled="sendingZip">
             </div>
-            <p class="mt-2">Cargando contenido del archivo...</p>
-          </div>
-          
-          <div v-else-if="fileDataError" class="alert alert-danger">
-            <i class="bi bi-exclamation-triangle"></i>
-            {{ fileDataError }}
-          </div>
-          
-          <div v-else>
-            <div class="d-flex justify-content-between align-items-center mb-3">
-              <div>
-                <h6 class="mb-0">{{ selectedBot?.botName }} - {{ formatDate(selectedDataFile?.date) }}</h6>
-                <small class="text-muted">Total de registros: {{ fileData.length }}</small>
+            <div v-if="zipSendError" class="alert alert-danger">
+              <i class="bi bi-exclamation-triangle"></i>
+              {{ zipSendError }}
+            </div>
+            <div v-if="sendingZip" class="text-center py-2">
+              <div class="spinner-border text-success" role="status">
+                <span class="visually-hidden">Enviando...</span>
               </div>
-              <div class="btn-group btn-group-sm">
-                <button 
-                  class="btn btn-outline-primary"
-                  :class="{ active: dataViewMode === 'formatted' }"
-                  @click="dataViewMode = 'formatted'"
-                >
-                  <i class="bi bi-list-ul"></i>
-                  Formateado
-                </button>
-                <button 
-                  class="btn btn-outline-primary"
-                  :class="{ active: dataViewMode === 'json' }"
-                  @click="dataViewMode = 'json'"
-                >
-                  <i class="bi bi-code"></i>
-                  JSON
-                </button>
-              </div>
+              <p class="mt-2">Enviando archivo ZIP...</p>
             </div>
-            
-            <!-- Vista formateada -->
-            <div v-if="dataViewMode === 'formatted'" class="data-viewer" style="max-height: 500px; overflow-y: auto;">
-              <div v-for="(entry, index) in fileData" :key="index" class="data-entry mb-3 p-3 border rounded">
-                <div class="d-flex justify-content-between align-items-start mb-2">
-                  <span class="badge bg-primary">{{ entry.data.category || 'general' }}</span>
-                  <small class="text-muted">{{ new Date(entry.timestamp).toLocaleString() }}</small>
-                </div>
-                
-                <div class="data-content">
-                  <h6 v-if="entry.data.payload.title">{{ entry.data.payload.title }}</h6>
-                  
-                  <div v-if="typeof entry.data.payload === 'object'">
-                    <div v-for="(value, key) in entry.data.payload" :key="key" class="mb-2">
-                      <strong>{{ key }}:</strong>
-                      <div v-if="typeof value === 'object'" class="ms-3">
-                        <pre class="bg-light p-2 rounded small">{{ JSON.stringify(value, null, 2) }}</pre>
-                      </div>
-                      <span v-else class="ms-2">{{ value }}</span>
-                    </div>
-                  </div>
-                  
-                  <div v-else>
-                    <p>{{ entry.data.payload }}</p>
-                  </div>
-                  
-                  <div v-if="entry.data.metadata && Object.keys(entry.data.metadata).length > 0" class="mt-2">
-                    <small class="text-muted">
-                      <strong>Metadata:</strong>
-                      {{ JSON.stringify(entry.data.metadata) }}
-                    </small>
-                  </div>
-                </div>
-              </div>
+            <div v-if="zipSendSuccess" class="alert alert-success">
+              <i class="bi bi-check-circle"></i>
+              Archivo ZIP enviado correctamente.
             </div>
-            
-            <!-- Vista JSON -->
-            <div v-else class="json-viewer">
-              <pre class="bg-dark text-light p-3 rounded" style="max-height: 500px; overflow: auto;">{{ JSON.stringify(fileData, null, 2) }}</pre>
+            <div class="modal-footer">
+              <button type="submit" class="btn btn-success" :disabled="!selectedZipFile || sendingZip">
+                <i class="bi bi-upload"></i>
+                Enviar ZIP
+              </button>
+              <button type="button" class="btn btn-secondary" @click="closeSendZipModal" :disabled="sendingZip">Cerrar</button>
             </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-outline-primary" @click="downloadDataFile" v-if="fileData.length > 0">
-            <i class="bi bi-download"></i>
-            Descargar JSON
-          </button>
-          <button type="button" class="btn btn-secondary" @click="selectedDataFile = null">Cerrar</button>
+          </form>
         </div>
       </div>
     </div>
   </div>
+  <!-- ...existing code... -->
 </template>
 
 <script setup>
@@ -657,6 +603,70 @@ const loadingFileData = ref(false);
 const fileDataError = ref('');
 const fileData = ref([]);
 const dataViewMode = ref('formatted'); // 'formatted' o 'json'
+
+// Variables para envío de ZIP
+const showSendZipModal = ref(false);
+const zipTargetBot = ref(null);
+const selectedZipFile = ref(null);
+const sendingZip = ref(false);
+const zipSendError = ref('');
+const zipSendSuccess = ref(false);
+
+function openSendZipModal(bot) {
+  zipTargetBot.value = bot;
+  showSendZipModal.value = true;
+  selectedZipFile.value = null;
+  sendingZip.value = false;
+  zipSendError.value = '';
+  zipSendSuccess.value = false;
+}
+
+function closeSendZipModal() {
+  showSendZipModal.value = false;
+  zipTargetBot.value = null;
+  selectedZipFile.value = null;
+  sendingZip.value = false;
+  zipSendError.value = '';
+  zipSendSuccess.value = false;
+}
+
+function onZipFileChange(event) {
+  const file = event.target.files[0];
+  if (file && file.name.endsWith('.zip')) {
+    selectedZipFile.value = file;
+    zipSendError.value = '';
+  } else {
+    selectedZipFile.value = null;
+    zipSendError.value = 'Solo se permiten archivos .zip.';
+  }
+}
+
+async function handleSendZip() {
+  if (!selectedZipFile.value || !zipTargetBot.value) return;
+  sendingZip.value = true;
+  zipSendError.value = '';
+  zipSendSuccess.value = false;
+  try {
+    const formData = new FormData();
+    formData.append('zip', selectedZipFile.value);
+    formData.append('botId', zipTargetBot.value.id);
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/send-zip`, {
+      method: 'POST',
+      body: formData
+    });
+    if (response.ok) {
+      zipSendSuccess.value = true;
+      zipSendError.value = '';
+    } else {
+      const data = await response.json();
+      zipSendError.value = data.error || 'Error al enviar el archivo ZIP.';
+    }
+  } catch (error) {
+    zipSendError.value = 'Error de red o servidor.';
+  } finally {
+    sendingZip.value = false;
+  }
+}
 
 // Función para calcular dimensiones del terminal
 function calculateTerminalDimensions() {
@@ -715,7 +725,7 @@ onMounted(async () => {
 
 async function verifyToken(token) {
   try {
-    const response = await fetch('/api/verify-token', {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/verify-token`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }
@@ -740,7 +750,7 @@ async function login() {
   loginError.value = '';
   
   try {
-    const response = await fetch('/api/login', {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
