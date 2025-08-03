@@ -227,13 +227,21 @@
                               Comandos
                             </button>
                             <button 
-                              class="btn btn-sm btn-outline-success"
+                              class="btn btn-sm position-relative"
+                              :class="hasActiveTerminalSession(bot) ? 'btn-success' : 'btn-outline-success'"
                               @click="openConsole(bot)"
                               data-bs-toggle="modal" 
                               data-bs-target="#consoleModal"
                             >
                               <i class="bi bi-terminal"></i>
                               Consola
+                              <span 
+                                v-if="hasActiveTerminalSession(bot)" 
+                                class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning text-dark"
+                              >
+                                <i class="bi bi-circle-fill" style="font-size: 8px;"></i>
+                                <span class="visually-hidden">Sesión activa</span>
+                              </span>
                             </button>
                           </div>
                         </div>
@@ -304,19 +312,31 @@
             <div class="terminal-container" style="height: 400px; background-color: #0d1117;">
               <div 
                 class="terminal-output p-3" 
-                style="height: 350px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 14px; white-space: pre-wrap;"
+                id="terminal-content"
+                style="height: 350px; overflow-x: auto; overflow-y: auto; font-family: 'Consolas', 'Monaco', 'Courier New', monospace; font-size: 12px; line-height: 1.2; white-space: pre-wrap; background-color: #0d1117; color: #c9d1d9; word-wrap: break-word;"
                 ref="terminalOutput"
               >
                 <div v-for="(line, index) in terminalLines" :key="index" v-html="formatTerminalOutput(line.data || line)"></div>
                 <div v-if="terminalLines.length === 0" class="text-muted">
-                  Terminal listo. Conectando...
+                  <div v-if="!isBotConnected()">
+                    ⚠️ El bot no está conectado al servidor.
+                  </div>
+                  <div v-else-if="!terminalConnected">
+                    🖥️ Terminal listo. Presiona "Iniciar Terminal" para comenzar.
+                  </div>
+                  <div v-else>
+                    ⏳ Iniciando sesión de terminal...
+                  </div>
                 </div>
               </div>
               <div class="terminal-input border-top border-secondary p-2" style="background-color: #161b22;">
                 <div class="input-group">
-                  <span class="input-group-text bg-dark text-success border-secondary">
+                  <span 
+                    class="input-group-text bg-dark border-secondary"
+                    :class="getTerminalStatusClass()"
+                  >
                     <i class="bi bi-terminal"></i>
-                    {{ terminalConnected ? 'Conectado' : 'Desconectado' }}
+                    {{ getTerminalStatusText() }}
                   </span>
                   <input 
                     type="text" 
@@ -324,25 +344,36 @@
                     placeholder="Escribe en la terminal..."
                     v-model="terminalInput"
                     @keydown="handleTerminalKeydown"
-                    :disabled="!terminalConnected"
+                    :disabled="!isBotConnected()"
                     ref="terminalInputField"
                   >
                   <button 
-                    class="btn btn-outline-success" 
+                    :class="isBotConnected() ? 'btn btn-outline-success' : 'btn btn-outline-secondary'" 
                     @click="startTerminalSession"
                     v-if="!terminalConnected"
+                    :disabled="!isBotConnected()"
+                    :title="isBotConnected() ? 'Iniciar sesión de terminal' : 'Bot no conectado al servidor'"
                   >
                     <i class="bi bi-play-circle"></i>
-                    Conectar
+                    {{ isBotConnected() ? 'Iniciar Terminal' : 'Bot Desconectado' }}
                   </button>
                   <button 
                     class="btn btn-outline-danger" 
                     @click="stopTerminalSession"
-                    v-else
+                    v-if="terminalConnected"
+                    title="Terminar sesión de terminal"
                   >
                     <i class="bi bi-stop-circle"></i>
-                    Desconectar
+                    Terminar Terminal
                   </button>
+                  <span 
+                    v-if="!isBotConnected()"
+                    class="btn btn-outline-secondary disabled"
+                    title="Bot no está conectado al servidor"
+                  >
+                    <i class="bi bi-exclamation-triangle"></i>
+                    Bot Desconectado
+                  </span>
                 </div>
               </div>
             </div>
@@ -357,7 +388,7 @@
                 type="button" 
                 class="btn btn-outline-info" 
                 @click="sendTerminalCommand('clear')"
-                :disabled="!terminalConnected"
+                :disabled="!terminalConnected || !isBotConnected()"
                 title="Limpiar pantalla"
               >
                 <i class="bi bi-eraser"></i>
@@ -367,13 +398,22 @@
                 type="button" 
                 class="btn btn-outline-info" 
                 @click="sendTerminalCommand('exit')"
-                :disabled="!terminalConnected"
+                :disabled="!terminalConnected || !isBotConnected()"
                 title="Salir"
               >
                 <i class="bi bi-box-arrow-right"></i>
                 Exit
               </button>
             </div>
+            <button 
+              type="button" 
+              class="btn btn-outline-danger" 
+              @click="clearBotSession"
+              title="Limpiar sesión del bot"
+            >
+              <i class="bi bi-x-circle"></i>
+              Limpiar Sesión
+            </button>
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
               Cerrar
             </button>
@@ -415,11 +455,46 @@ const terminalSessionId = ref(null);
 const terminalConnected = ref(false);
 const terminalLines = ref([]);
 const terminalInput = ref('');
-const terminalCols = ref(80);
-const terminalRows = ref(24);
+const terminalCols = ref(120);  // Ancho estándar para comandos como htop
+const terminalRows = ref(30);   // Altura estándar
 const terminalRawMode = ref(false);
 const terminalInputField = ref(null);
+
+// Mapa para rastrear sessionId -> botId
+const sessionToBotMap = ref(new Map());
 const terminalOutput = ref(null);
+
+// Almacenar sesiones PTY por bot
+const botTerminalSessions = ref(new Map());
+
+// Función para calcular dimensiones del terminal
+function calculateTerminalDimensions() {
+  const terminal = terminalOutput.value;
+  if (!terminal) {
+    return { cols: 120, rows: 30 }; // valores por defecto
+  }
+  
+  // Obtener el tamaño de la fuente
+  const styles = window.getComputedStyle(terminal);
+  const fontSize = parseFloat(styles.fontSize);
+  const lineHeight = parseFloat(styles.lineHeight) || fontSize * 1.2;
+  
+  // Calcular dimensiones basadas en el contenedor
+  const containerWidth = terminal.clientWidth - 24; // restar padding
+  const containerHeight = terminal.clientHeight - 24; // restar padding
+  
+  // Calcular caracteres por ancho (más preciso para fuentes monospace)
+  // Consolas/Monaco tienen un ratio de ~0.6, Courier New ~0.65
+  const charWidth = fontSize * 0.6;
+  const cols = Math.floor(containerWidth / charWidth);
+  const rows = Math.floor(containerHeight / lineHeight);
+  
+  return {
+    // Preferir un ancho conservador para comandos estructurados
+    cols: Math.max(100, Math.min(cols, 150)), // entre 100 y 150 columnas (óptimo para htop)
+    rows: Math.max(25, Math.min(rows, 40))    // entre 25 y 40 filas
+  };
+}
 
 let ws;
 let authToken = '';
@@ -436,6 +511,15 @@ onMounted(async () => {
       localStorage.removeItem('bot_commander_token');
     }
   }
+  
+  // Agregar listener para redimensionar terminal cuando cambie el tamaño de ventana
+  window.addEventListener('resize', () => {
+    if (terminalConnected.value && terminalSessionId.value) {
+      setTimeout(() => {
+        resizeTerminal();
+      }, 100);
+    }
+  });
 });
 
 async function verifyToken(token) {
@@ -526,6 +610,13 @@ function initializeWebSocket() {
   ws.onclose = (event) => {
     console.log('WebSocket cerrado:', event.code, event.reason);
     connectionStatus.value = 'Desconectado';
+    
+    // Limpiar todas las sesiones PTY al desconectarse
+    botTerminalSessions.value.clear();
+    terminalSessionId.value = null;
+    terminalConnected.value = false;
+    
+    console.log('Sesiones PTY limpiadas debido a desconexión WebSocket');
   };
   
   ws.onmessage = (event) => {
@@ -573,16 +664,59 @@ function initializeWebSocket() {
 function openConsole(bot) {
   selectedBot.value = bot;
   
-  // Inicializar PTY
-  terminalSessionId.value = null;
-  terminalConnected.value = false;
-  terminalLines.value = [];
-  terminalInput.value = '';
+  // Obtener o crear sesión para este bot
+  let session = botTerminalSessions.value.get(bot.id);
+  
+  if (session && session.connected) {
+    // Restaurar sesión existente
+    terminalSessionId.value = session.sessionId;
+    terminalConnected.value = session.connected;
+    terminalLines.value = session.lines || [];
+    terminalInput.value = '';
+    
+    // Registrar sessionId -> botId para futuros mensajes
+    sessionToBotMap.value.set(session.sessionId, bot.id);
+    
+    console.log(`Restaurando sesión PTY existente para ${bot.botName}: ${session.sessionId}`);
+    
+    // Agregar mensaje informativo sobre la restauración
+    terminalLines.value.push({
+      data: `\x1b[36m[Sesión restaurada: ${session.sessionId}]\x1b[0m\r\n`,
+      timestamp: new Date()
+    });
+  } else if (session && !session.connected) {
+    // Sesión desconectada, mostrar historial pero no permitir comandos
+    terminalSessionId.value = null;
+    terminalConnected.value = false;
+    terminalLines.value = session.lines || [];
+    terminalInput.value = '';
+    
+    console.log(`Mostrando historial de sesión desconectada para ${bot.botName}`);
+    
+    // Agregar mensaje informativo
+    terminalLines.value.push({
+      data: `\x1b[33m[Sesión desconectada - Historial del terminal]\x1b[0m\r\n`,
+      timestamp: new Date()
+    });
+  } else {
+    // Inicializar nueva sesión
+    terminalSessionId.value = null;
+    terminalConnected.value = false;
+    terminalLines.value = [];
+    terminalInput.value = '';
+
+    console.log(`Iniciando nueva sesión PTY para ${bot.botName}`);
+  }
   
   // Focus input after modal is shown
   setTimeout(() => {
-    if (consoleInput.value) {
-      consoleInput.value.focus();
+    if (terminalInputField.value) {
+      terminalInputField.value.focus();
+    }
+    
+    // Redimensionar terminal si hay una sesión activa
+    if (terminalConnected.value && terminalSessionId.value) {
+      resizeTerminal();
     }
   }, 500);
 }
@@ -591,7 +725,14 @@ function openConsole(bot) {
 function startTerminalSession() {
   if (!selectedBot.value || terminalConnected.value) return;
   
+  // Calcular dimensiones automáticamente
+  const dimensions = calculateTerminalDimensions();
+  terminalCols.value = dimensions.cols;
+  terminalRows.value = dimensions.rows;
+  
   const requestId = `pty_req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  console.log(`Iniciando terminal PTY con dimensiones: ${dimensions.cols}x${dimensions.rows}`);
   
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({
@@ -620,6 +761,13 @@ function killTerminalSession() {
 
 function resizeTerminal() {
   if (!terminalSessionId.value || !terminalConnected.value) return;
+  
+  // Recalcular dimensiones automáticamente
+  const dimensions = calculateTerminalDimensions();
+  terminalCols.value = dimensions.cols;
+  terminalRows.value = dimensions.rows;
+  
+  console.log(`Redimensionando terminal PTY a: ${dimensions.cols}x${dimensions.rows}`);
   
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({
@@ -680,6 +828,72 @@ function clearTerminal() {
   terminalLines.value = [];
 }
 
+function clearBotSession() {
+  if (selectedBot.value) {
+    const botId = selectedBot.value.id;
+    
+    // Eliminar sesión del bot
+    botTerminalSessions.value.delete(botId);
+    
+    // Limpiar estado actual
+    terminalSessionId.value = null;
+    terminalConnected.value = false;
+    terminalLines.value = [];
+    terminalInput.value = '';
+    
+    console.log(`Sesión PTY limpiada para ${selectedBot.value.botName}`);
+    
+    // Agregar mensaje informativo
+    terminalLines.value.push({
+      data: `\x1b[31m[Sesión limpiada manualmente]\x1b[0m\r\n`,
+      timestamp: new Date()
+    });
+  }
+}
+
+function hasActiveTerminalSession(bot) {
+  // Verificar si el bot tiene una sesión PTY activa
+  const session = botTerminalSessions.value.get(bot.id);
+  return session && session.connected && session.sessionId;
+}
+
+function getTerminalStatusText() {
+  if (!selectedBot.value) return 'Sin bot';
+  
+  // Verificar si el bot está conectado al servidor
+  const isConnected = bots.value.some(bot => bot.id === selectedBot.value.id);
+  if (!isConnected) return 'Bot desconectado';
+  
+  // Si tiene sesión PTY activa
+  if (terminalConnected.value && terminalSessionId.value) {
+    return 'Terminal activo';
+  }
+  
+  // Bot conectado pero sin terminal
+  return 'Listo para terminal';
+}
+
+function getTerminalStatusClass() {
+  if (!selectedBot.value) return 'text-muted';
+  
+  // Verificar si el bot está conectado al servidor
+  const isConnected = bots.value.some(bot => bot.id === selectedBot.value.id);
+  if (!isConnected) return 'text-danger';
+  
+  // Si tiene sesión PTY activa
+  if (terminalConnected.value && terminalSessionId.value) {
+    return 'text-success';
+  }
+  
+  // Bot conectado pero sin terminal
+  return 'text-warning';
+}
+
+function isBotConnected() {
+  if (!selectedBot.value) return false;
+  return bots.value.some(bot => bot.id === selectedBot.value.id);
+}
+
 function toggleRawMode() {
   terminalRawMode.value = !terminalRawMode.value;
 }
@@ -727,76 +941,194 @@ function disconnectTerminal() {
 }
 
 function handlePtyMessage(data) {
+  console.log('Mensaje recibido:', data);
+  
+  // Para pty_started, usamos el bot seleccionado
+  if (data.type === 'pty_started') {
+    const botId = selectedBot.value?.id;
+    if (!botId) return;
+    
+    handlePtyStarted(data, botId);
+    return;
+  }
+  
+  // Para otros mensajes PTY, encontramos el bot usando sessionId
+  const botId = sessionToBotMap.value.get(data.sessionId);
+  if (!botId) {
+    console.warn(`Ignorando mensaje ${data.type} de sesión desconocida: ${data.sessionId}`);
+    return;
+  }
+  
+  // Obtener la sesión del bot correspondiente
+  const session = botTerminalSessions.value.get(botId);
+  if (!session || session.sessionId !== data.sessionId) {
+    console.warn(`Sesión desconocida para bot ${botId}: ${data.sessionId}`);
+    return;
+  }
+  
   switch (data.type) {
-    case 'pty_started':
-      terminalSessionId.value = data.sessionId;
-      terminalConnected.value = true;
-      terminalLines.value.push({
-        data: `\x1b[32m[Sesión iniciada: ${data.sessionId}]\x1b[0m\r\n`,
-        timestamp: new Date()
-      });
-      scrollTerminalToBottom();
-      
-      // Focus terminal input
-      setTimeout(() => {
-        if (terminalInputField.value) {
-          terminalInputField.value.focus();
-        }
-      }, 100);
-      break;
-      
     case 'pty_output':
-      if (data.sessionId === terminalSessionId.value) {
-        let processedData = data.data;
-        
-        // Limitar número de líneas para performance
-        if (terminalLines.value.length > 50) {
-          terminalLines.value = terminalLines.value.slice(-20);
-        }
-        
-        terminalLines.value.push({
-          data: processedData,
-          timestamp: new Date()
-        });
-        scrollTerminalToBottom();
-      }
+      handlePtyOutput(data, botId);
       break;
       
     case 'pty_session_ended':
-      if (data.sessionId === terminalSessionId.value) {
-        terminalConnected.value = false;
-        terminalLines.value.push({
-          data: `\x1b[31m[Sesión terminada: código ${data.exitCode}]\x1b[0m\r\n`,
-          timestamp: new Date()
-        });
-        scrollTerminalToBottom();
-        terminalSessionId.value = null;
-      }
+      handlePtySessionEnded(data, botId);
       break;
       
     case 'pty_sessions_list':
-      const sessions = data.sessions || [];
-      terminalLines.value.push({
-        data: `\x1b[36m[Sesiones activas: ${sessions.length}]\x1b[0m\r\n`,
-        timestamp: new Date()
-      });
-      sessions.forEach(session => {
-        terminalLines.value.push({
-          data: `\x1b[36m- ${session.sessionId}: ${session.command} (${Math.floor(session.uptime/1000)}s)\x1b[0m\r\n`,
-          timestamp: new Date()
-        });
-      });
-      scrollTerminalToBottom();
+      // Este mensaje es del bot actualmente seleccionado
+      const currentBotId = selectedBot.value?.id;
+      if (currentBotId && currentBotId === botId) {
+        handlePtySessionsList(data);
+      }
       break;
       
     case 'pty_error':
-      terminalLines.value.push({
-        data: `\x1b[31m[Error: ${data.error}]\x1b[0m\r\n`,
-        timestamp: new Date()
-      });
-      scrollTerminalToBottom();
+      // Este mensaje es del bot actualmente seleccionado
+      const errorBotId = selectedBot.value?.id;
+      if (errorBotId && errorBotId === botId) {
+        handlePtyError(data);
+      }
       break;
+      
+    default:
+      console.warn('Tipo de mensaje PTY desconocido:', data.type);
   }
+}
+
+function handlePtyStarted(data, botId) {
+  // Solo actualizar UI si es el bot actualmente abierto en el modal
+  const isCurrentBot = selectedBot.value?.id === botId;
+  
+  if (isCurrentBot) {
+    terminalSessionId.value = data.sessionId;
+    terminalConnected.value = true;
+  }
+  
+  // Registrar sessionId -> botId para futuros mensajes
+  sessionToBotMap.value.set(data.sessionId, botId);
+  
+  const startMessage = {
+    data: `\x1b[32m[Sesión iniciada: ${data.sessionId}]\x1b[0m\r\n`,
+    timestamp: new Date()
+  };
+  
+  // Actualizar UI solo si es el bot actual
+  if (isCurrentBot) {
+    terminalLines.value.push(startMessage);
+    scrollTerminalToBottom();
+    
+    // Focus terminal input
+    setTimeout(() => {
+      if (terminalInputField.value) {
+        terminalInputField.value.focus();
+      }
+    }, 100);
+  }
+  
+  // Siempre actualizar la sesión almacenada
+  botTerminalSessions.value.set(botId, {
+    sessionId: data.sessionId,
+    connected: true,
+    lines: isCurrentBot ? [...terminalLines.value] : [startMessage],
+    createdAt: new Date()
+  });
+  
+  console.log(`Sesión PTY iniciada para bot ${botId}: ${data.sessionId}`);
+}
+
+function handlePtyOutput(data, botId) {
+  const session = botTerminalSessions.value.get(botId);
+  if (!session) return;
+  
+  const outputMessage = {
+    data: data.data,
+    timestamp: new Date()
+  };
+  
+  // Actualizar sesión almacenada
+  const updatedLines = [...(session.lines || []), outputMessage];
+  
+  // Limitar líneas para performance
+  if (updatedLines.length > 50) {
+    updatedLines.splice(0, updatedLines.length - 20);
+  }
+  
+  botTerminalSessions.value.set(botId, {
+    ...session,
+    lines: updatedLines,
+    lastActivity: new Date()
+  });
+  
+  // Solo actualizar UI si es el bot actualmente abierto
+  const isCurrentBot = selectedBot.value?.id === botId && terminalSessionId.value === data.sessionId;
+  if (isCurrentBot) {
+    // Limitar líneas en UI para performance
+    if (terminalLines.value.length > 50) {
+      terminalLines.value = terminalLines.value.slice(-20);
+    }
+    
+    terminalLines.value.push(outputMessage);
+    scrollTerminalToBottom();
+  }
+  
+  console.log(`Output PTY recibido para bot ${botId} (${session.lines?.length || 0} líneas total)`);
+}
+
+function handlePtySessionEnded(data, botId) {
+  const session = botTerminalSessions.value.get(botId);
+  if (!session) return;
+  
+  const endMessage = {
+    data: `\x1b[31m[Sesión terminada: código ${data.exitCode || 'desconocido'}]\x1b[0m\r\n`,
+    timestamp: new Date()
+  };
+  
+  // Actualizar sesión almacenada
+  const updatedLines = [...(session.lines || []), endMessage];
+  botTerminalSessions.value.set(botId, {
+    ...session,
+    connected: false,
+    lines: updatedLines,
+    lastActivity: new Date()
+  });
+  
+  // Limpiar mapeo de sessionId
+  sessionToBotMap.value.delete(data.sessionId);
+  
+  // Solo actualizar UI si es el bot actualmente abierto
+  const isCurrentBot = selectedBot.value?.id === botId && terminalSessionId.value === data.sessionId;
+  if (isCurrentBot) {
+    terminalLines.value.push(endMessage);
+    terminalConnected.value = false;
+    terminalSessionId.value = null;
+    scrollTerminalToBottom();
+  }
+  
+  console.log(`Sesión PTY terminada para bot ${botId}: ${data.sessionId}`);
+}
+
+function handlePtySessionsList(data) {
+  const sessions = data.sessions || [];
+  terminalLines.value.push({
+    data: `\x1b[36m[Sesiones activas: ${sessions.length}]\x1b[0m\r\n`,
+    timestamp: new Date()
+  });
+  sessions.forEach(session => {
+    terminalLines.value.push({
+      data: `\x1b[36m- ${session.sessionId}: ${session.command} (${Math.floor(session.uptime/1000)}s)\x1b[0m\r\n`,
+      timestamp: new Date()
+    });
+  });
+  scrollTerminalToBottom();
+}
+
+function handlePtyError(data) {
+  terminalLines.value.push({
+    data: `\x1b[31m[Error: ${data.error}]\x1b[0m\r\n`,
+    timestamp: new Date()
+  });
+  scrollTerminalToBottom();
 }
 
 function executeCommand() {
@@ -1023,6 +1355,9 @@ function scrollTerminalToBottom() {
 
 onUnmounted(() => {
   if (ws) ws.close();
+  
+  // Limpiar listeners
+  window.removeEventListener('resize', resizeTerminal);
 });
 </script>
 
@@ -1142,11 +1477,47 @@ code {
 .terminal-line {
   margin-bottom: 1px;
   line-height: 1.2;
-  white-space: pre-wrap;
+  white-space: pre-wrap;  /* Preservar espacios con wrapping cuando sea necesario */
   word-wrap: break-word;
   overflow-wrap: anywhere;
   display: block;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+
+/* Estilos específicos para el terminal PTY */
+#terminal-content {
+  scrollbar-width: thin;
+  scrollbar-color: #666 #0d1117;
+  /* Permitir scroll horizontal para contenido muy ancho */
+  overflow-x: auto;
+  overflow-y: auto;
+}
+
+/* Manejar líneas muy largas */
+#terminal-content div {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  /* Permitir que las líneas largas se ajusten */
   max-width: 100%;
+}
+
+#terminal-content::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+#terminal-content::-webkit-scrollbar-track {
+  background: #0d1117;
+}
+
+#terminal-content::-webkit-scrollbar-thumb {
+  background: #666;
+  border-radius: 4px;
+}
+
+#terminal-content::-webkit-scrollbar-thumb:hover {
+  background: #888;
 }
 
 .terminal-input-field {
