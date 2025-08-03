@@ -19,6 +19,15 @@ const __dirname = path.dirname(__filename);
 // Ruta del archivo de configuración de bots
 const BOT_KEYS_FILE = path.resolve(__dirname, '../../bot-keys.json');
 
+// Ruta del directorio de datos de bots
+const BOT_DATA_DIR = path.resolve(__dirname, '../../bot_data');
+
+// Almacenamiento en memoria para datos de bots
+const botDataBuffer = new Map();
+
+// Configuración del intervalo de guardado (en minutos)
+const SAVE_INTERVAL_MINUTES = parseInt(process.env.BOT_DATA_SAVE_INTERVAL) || 5;
+
 // Cargar configuración de bots
 function loadBotKeys() {
   if (!fs.existsSync(BOT_KEYS_FILE)) {
@@ -57,6 +66,142 @@ async function validateBotApiKey(username, apiKey) {
   } catch (error) {
     console.error('Error validando API key:', error);
     return { valid: false, reason: 'Error interno' };
+  }
+}
+
+// Funciones para manejar datos de bots
+function ensureBotDataDirectory() {
+  if (!fs.existsSync(BOT_DATA_DIR)) {
+    fs.mkdirSync(BOT_DATA_DIR, { recursive: true });
+    console.log(`📁 Directorio de datos de bots creado: ${BOT_DATA_DIR}`);
+  }
+}
+
+function getDateString() {
+  const now = new Date();
+  return now.toISOString().split('T')[0]; // YYYY-MM-DD
+}
+
+function getBotDataFilePath(botName, date) {
+  ensureBotDataDirectory();
+  return path.join(BOT_DATA_DIR, `${botName}_${date}.json`);
+}
+
+function storeBotData(botName, data) {
+  const date = getDateString();
+  const key = `${botName}_${date}`;
+  
+  if (!botDataBuffer.has(key)) {
+    botDataBuffer.set(key, []);
+  }
+  
+  const botData = {
+    timestamp: Date.now(),
+    data: data
+  };
+  
+  botDataBuffer.get(key).push(botData);
+}
+
+function saveBotDataToFile() {
+  if (botDataBuffer.size === 0) {
+    return;
+  }
+  
+  console.log(`💾 Guardando datos de ${botDataBuffer.size} bots...`);
+  
+  for (const [key, dataArray] of botDataBuffer.entries()) {
+    const [botName, date] = key.split('_');
+    const filePath = getBotDataFilePath(botName, date);
+    
+    let existingData = [];
+    if (fs.existsSync(filePath)) {
+      try {
+        const fileContent = fs.readFileSync(filePath, 'utf8');
+        existingData = JSON.parse(fileContent);
+      } catch (error) {
+        console.error(`Error leyendo archivo existente ${filePath}:`, error.message);
+      }
+    }
+    
+    const allData = [...existingData, ...dataArray];
+    
+    try {
+      fs.writeFileSync(filePath, JSON.stringify(allData, null, 2), 'utf8');
+      console.log(`✅ Datos guardados para ${botName} en ${filePath} (${dataArray.length} nuevos registros)`);
+    } catch (error) {
+      console.error(`❌ Error guardando datos para ${botName}:`, error.message);
+    }
+  }
+  
+  // Limpiar buffer después de guardar
+  botDataBuffer.clear();
+}
+
+function loadBotDataFromFile(botName, date) {
+  const filePath = getBotDataFilePath(botName, date);
+  
+  if (!fs.existsSync(filePath)) {
+    return [];
+  }
+  
+  try {
+    const fileContent = fs.readFileSync(filePath, 'utf8');
+    return JSON.parse(fileContent);
+  } catch (error) {
+    console.error(`Error leyendo datos del bot ${botName} para la fecha ${date}:`, error.message);
+    return [];
+  }
+}
+
+function getBotDataFiles(botName) {
+  ensureBotDataDirectory();
+  
+  try {
+    const files = fs.readdirSync(BOT_DATA_DIR);
+    const botFiles = files
+      .filter(file => file.startsWith(`${botName}_`) && file.endsWith('.json'))
+      .map(file => {
+        const date = file.replace(`${botName}_`, '').replace('.json', '');
+        const filePath = path.join(BOT_DATA_DIR, file);
+        const stats = fs.statSync(filePath);
+        return {
+          date,
+          file,
+          size: stats.size,
+          modified: stats.mtime.toISOString()
+        };
+      })
+      .sort((a, b) => b.date.localeCompare(a.date)); // Ordenar por fecha descendente
+    
+    return botFiles;
+  } catch (error) {
+    console.error(`Error listando archivos para bot ${botName}:`, error.message);
+    return [];
+  }
+}
+
+function getAllBotNames() {
+  ensureBotDataDirectory();
+  
+  try {
+    const files = fs.readdirSync(BOT_DATA_DIR);
+    const botNames = new Set();
+    
+    files
+      .filter(file => file.endsWith('.json'))
+      .forEach(file => {
+        const parts = file.split('_');
+        if (parts.length >= 2) {
+          const botName = parts.slice(0, -1).join('_'); // Todo excepto la fecha
+          botNames.add(botName);
+        }
+      });
+    
+    return Array.from(botNames).sort();
+  } catch (error) {
+    console.error('Error listando nombres de bots:', error.message);
+    return [];
   }
 }
 
@@ -361,6 +506,35 @@ wss.on('connection', (ws, req) => {
         ws.send(JSON.stringify({ type: 'heartbeat_ack' }));
       }
       
+      // Manejar mensajes genéricos de bots (información, datos, logs, etc.)
+      if (message.type === 'generic_message' && clients[clientId].type === 'bot') {
+        const botName = clients[clientId].username || clients[clientId].botName;
+        
+        if (botName && message.payload) {
+          // Almacenar la información en memoria
+          storeBotData(botName, {
+            type: message.type,
+            category: message.category || 'general',
+            priority: message.priority || 'normal',
+            payload: message.payload,
+            metadata: message.metadata || {},
+            botName: botName
+          });
+          
+          console.log(`📊 Información recibida de ${botName}: ${message.category || 'general'}`);
+          
+          // Si el bot espera respuesta, enviar confirmación
+          if (message.expectResponse && message.requestId) {
+            ws.send(JSON.stringify({
+              type: 'generic_message_response',
+              requestId: message.requestId,
+              success: true,
+              message: 'Información recibida y almacenada'
+            }));
+          }
+        }
+      }
+      
       // Manejar comandos desde paneles hacia bots
       if (message.type === 'command' && clients[clientId].type === 'panel') {
         const targetBot = message.targetBot;
@@ -603,6 +777,62 @@ app.get('/api/bots', authenticateToken, (req, res) => {
   });
 });
 
+// Endpoint para obtener archivos de datos de un bot específico
+app.get('/api/bot-data/:botName/files', authenticateToken, (req, res) => {
+  try {
+    const { botName } = req.params;
+    const files = getBotDataFiles(botName);
+    
+    res.json({
+      botName,
+      files,
+      total: files.length
+    });
+  } catch (error) {
+    console.error('Error obteniendo archivos de bot:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Endpoint para obtener datos de un bot en una fecha específica
+app.get('/api/bot-data/:botName/date/:date', authenticateToken, (req, res) => {
+  try {
+    const { botName, date } = req.params;
+    
+    // Validar formato de fecha YYYY-MM-DD
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({ error: 'Formato de fecha inválido. Use YYYY-MM-DD' });
+    }
+    
+    const data = loadBotDataFromFile(botName, date);
+    
+    res.json({
+      botName,
+      date,
+      data,
+      total: data.length
+    });
+  } catch (error) {
+    console.error('Error obteniendo datos de bot:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Endpoint para obtener todos los bots que tienen datos
+app.get('/api/bot-data/bots', authenticateToken, (req, res) => {
+  try {
+    const botNames = getAllBotNames();
+    
+    res.json({
+      bots: botNames,
+      total: botNames.length
+    });
+  } catch (error) {
+    console.error('Error obteniendo lista de bots:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
 const HOST = process.env.API_HOST || '0.0.0.0';
 const PORT = process.env.API_PORT || 3000;
 
@@ -620,12 +850,36 @@ async function startServer() {
       if (serveMode === 'production') {
         console.log(`📱 Panel de control disponible en: http://${HOST}:${PORT}`);
       }
+      
+      // Iniciar el intervalo de guardado de datos de bots
+      const saveIntervalMs = SAVE_INTERVAL_MINUTES * 60 * 1000;
+      setInterval(saveBotDataToFile, saveIntervalMs);
+      console.log(`⏰ Intervalo de guardado de datos configurado: cada ${SAVE_INTERVAL_MINUTES} minutos`);
     });
   } catch (error) {
     console.error('💥 Error al iniciar el servidor:', error.message);
     process.exit(1);
   }
 }
+
+// Manejar cierre graceful del servidor
+process.on('SIGINT', () => {
+  console.log('\n🛑 Cerrando servidor...');
+  
+  // Guardar datos pendientes antes de cerrar
+  saveBotDataToFile();
+  
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log('\n🛑 Cerrando servidor...');
+  
+  // Guardar datos pendientes antes de cerrar
+  saveBotDataToFile();
+  
+  process.exit(0);
+});
 
 // Iniciar el servidor con build automático
 startServer();

@@ -217,7 +217,7 @@
                               {{ new Date(bot.lastActivity).toLocaleString() }}
                             </small>
                           </p>
-                          <div class="d-flex gap-2">
+                          <div class="d-flex gap-2 flex-wrap">
                             <button class="btn btn-sm btn-outline-primary">
                               <i class="bi bi-info-circle"></i>
                               Detalles
@@ -242,6 +242,15 @@
                                 <i class="bi bi-circle-fill" style="font-size: 8px;"></i>
                                 <span class="visually-hidden">Sesión activa</span>
                               </span>
+                            </button>
+                            <button 
+                              class="btn btn-sm btn-outline-info"
+                              @click="openBotDataModal(bot)"
+                              data-bs-toggle="modal" 
+                              data-bs-target="#botDataModal"
+                            >
+                              <i class="bi bi-database"></i>
+                              Datos
                             </button>
                           </div>
                         </div>
@@ -422,6 +431,178 @@
       </div>
     </div>
   </div>
+
+  <!-- Modal para Datos de Bot -->
+  <div class="modal fade" id="botDataModal" tabindex="-1" aria-labelledby="botDataModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="botDataModalLabel">
+            <i class="bi bi-database"></i>
+            Datos de {{ selectedBot?.botName || 'Bot' }}
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div v-if="loadingBotData" class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Cargando...</span>
+            </div>
+            <p class="mt-2">Cargando archivos de datos...</p>
+          </div>
+          
+          <div v-else-if="botDataError" class="alert alert-danger">
+            <i class="bi bi-exclamation-triangle"></i>
+            {{ botDataError }}
+          </div>
+          
+          <div v-else>
+            <h6>
+              <i class="bi bi-folder2-open"></i>
+              Archivos de datos por día ({{ botDataFiles.length }})
+            </h6>
+            
+            <div v-if="botDataFiles.length === 0" class="text-center py-4">
+              <i class="bi bi-file-earmark-x fs-1 text-muted"></i>
+              <p class="text-muted mt-2">No hay datos disponibles para este bot</p>
+            </div>
+            
+            <div v-else class="bot-data-files">
+              <div 
+                v-for="file in botDataFiles" 
+                :key="file.date"
+                class="file-item d-flex justify-content-between align-items-center p-3 mb-2 border rounded"
+                @click="openDataFile(file)"
+                style="cursor: pointer;"
+              >
+                <div>
+                  <div class="fw-bold">
+                    <i class="bi bi-calendar3"></i>
+                    {{ formatDate(file.date) }}
+                  </div>
+                  <small class="text-muted">
+                    <i class="bi bi-file-earmark-text"></i>
+                    {{ file.file }} • {{ formatFileSize(file.size) }}
+                  </small>
+                </div>
+                <div class="text-end">
+                  <small class="text-muted d-block">
+                    Modificado: {{ new Date(file.modified).toLocaleString() }}
+                  </small>
+                  <i class="bi bi-chevron-right text-primary"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para Ver Contenido de Archivo de Datos -->
+  <div class="modal fade" id="dataFileModal" tabindex="-1" aria-labelledby="dataFileModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="dataFileModalLabel">
+            <i class="bi bi-file-earmark-text"></i>
+            {{ selectedDataFile?.file || 'Archivo de datos' }}
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div v-if="loadingFileData" class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Cargando...</span>
+            </div>
+            <p class="mt-2">Cargando contenido del archivo...</p>
+          </div>
+          
+          <div v-else-if="fileDataError" class="alert alert-danger">
+            <i class="bi bi-exclamation-triangle"></i>
+            {{ fileDataError }}
+          </div>
+          
+          <div v-else>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <div>
+                <h6 class="mb-0">{{ selectedBot?.botName }} - {{ formatDate(selectedDataFile?.date) }}</h6>
+                <small class="text-muted">Total de registros: {{ fileData.length }}</small>
+              </div>
+              <div class="btn-group btn-group-sm">
+                <button 
+                  class="btn btn-outline-primary"
+                  :class="{ active: dataViewMode === 'formatted' }"
+                  @click="dataViewMode = 'formatted'"
+                >
+                  <i class="bi bi-list-ul"></i>
+                  Formateado
+                </button>
+                <button 
+                  class="btn btn-outline-primary"
+                  :class="{ active: dataViewMode === 'json' }"
+                  @click="dataViewMode = 'json'"
+                >
+                  <i class="bi bi-code"></i>
+                  JSON
+                </button>
+              </div>
+            </div>
+            
+            <!-- Vista formateada -->
+            <div v-if="dataViewMode === 'formatted'" class="data-viewer" style="max-height: 500px; overflow-y: auto;">
+              <div v-for="(entry, index) in fileData" :key="index" class="data-entry mb-3 p-3 border rounded">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                  <span class="badge bg-primary">{{ entry.data.category || 'general' }}</span>
+                  <small class="text-muted">{{ new Date(entry.timestamp).toLocaleString() }}</small>
+                </div>
+                
+                <div class="data-content">
+                  <h6 v-if="entry.data.payload.title">{{ entry.data.payload.title }}</h6>
+                  
+                  <div v-if="typeof entry.data.payload === 'object'">
+                    <div v-for="(value, key) in entry.data.payload" :key="key" class="mb-2">
+                      <strong>{{ key }}:</strong>
+                      <div v-if="typeof value === 'object'" class="ms-3">
+                        <pre class="bg-light p-2 rounded small">{{ JSON.stringify(value, null, 2) }}</pre>
+                      </div>
+                      <span v-else class="ms-2">{{ value }}</span>
+                    </div>
+                  </div>
+                  
+                  <div v-else>
+                    <p>{{ entry.data.payload }}</p>
+                  </div>
+                  
+                  <div v-if="entry.data.metadata && Object.keys(entry.data.metadata).length > 0" class="mt-2">
+                    <small class="text-muted">
+                      <strong>Metadata:</strong>
+                      {{ JSON.stringify(entry.data.metadata) }}
+                    </small>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Vista JSON -->
+            <div v-else class="json-viewer">
+              <pre class="bg-dark text-light p-3 rounded" style="max-height: 500px; overflow: auto;">{{ JSON.stringify(fileData, null, 2) }}</pre>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-primary" @click="downloadDataFile" v-if="fileData.length > 0">
+            <i class="bi bi-download"></i>
+            Descargar JSON
+          </button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
@@ -466,6 +647,16 @@ const terminalOutput = ref(null);
 
 // Almacenar sesiones PTY por bot
 const botTerminalSessions = ref(new Map());
+
+// Variables para datos de bots
+const loadingBotData = ref(false);
+const botDataError = ref('');
+const botDataFiles = ref([]);
+const selectedDataFile = ref(null);
+const loadingFileData = ref(false);
+const fileDataError = ref('');
+const fileData = ref([]);
+const dataViewMode = ref('formatted'); // 'formatted' o 'json'
 
 // Función para calcular dimensiones del terminal
 function calculateTerminalDimensions() {
@@ -1353,6 +1544,126 @@ function scrollTerminalToBottom() {
   }, 50);
 }
 
+// Funciones para manejo de datos de bots
+async function openBotDataModal(bot) {
+  selectedBot.value = bot;
+  botDataError.value = '';
+  botDataFiles.value = [];
+  loadingBotData.value = true;
+  
+  try {
+    await loadBotDataFiles(bot.username || bot.botName);
+  } catch (error) {
+    console.error('Error abriendo modal de datos:', error);
+    botDataError.value = 'Error al cargar los datos del bot';
+  } finally {
+    loadingBotData.value = false;
+  }
+}
+
+async function loadBotDataFiles(botName) {
+  try {
+    const response = await fetch(`/api/bot-data/${encodeURIComponent(botName)}/files`, {
+      headers: {
+        'Authorization': `Bearer ${authToken}`
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Error ${response.status}: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    botDataFiles.value = data.files || [];
+  } catch (error) {
+    console.error('Error cargando archivos de datos:', error);
+    throw error;
+  }
+}
+
+async function openDataFile(file) {
+  selectedDataFile.value = file;
+  fileDataError.value = '';
+  fileData.value = [];
+  loadingFileData.value = true;
+  dataViewMode.value = 'formatted';
+  
+  try {
+    const botName = selectedBot.value.username || selectedBot.value.botName;
+    await loadFileData(botName, file.date);
+    
+    // Mostrar el modal de contenido de archivo
+    const dataFileModal = new bootstrap.Modal(document.getElementById('dataFileModal'));
+    dataFileModal.show();
+  } catch (error) {
+    console.error('Error abriendo archivo:', error);
+    fileDataError.value = 'Error al cargar el contenido del archivo';
+  } finally {
+    loadingFileData.value = false;
+  }
+}
+
+async function loadFileData(botName, date) {
+  try {
+    const response = await fetch(`/api/bot-data/${encodeURIComponent(botName)}/date/${date}`, {
+      headers: {
+        'Authorization': `Bearer ${authToken}`
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Error ${response.status}: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    fileData.value = data.data || [];
+  } catch (error) {
+    console.error('Error cargando datos del archivo:', error);
+    throw error;
+  }
+}
+
+function formatDate(dateString) {
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('es-ES', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  } catch (error) {
+    return dateString;
+  }
+}
+
+function formatFileSize(bytes) {
+  if (bytes === 0) return '0 Bytes';
+  
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function downloadDataFile() {
+  if (fileData.value.length === 0) return;
+  
+  const filename = `${selectedBot.value.botName || 'bot'}_${selectedDataFile.value.date}.json`;
+  const dataStr = JSON.stringify(fileData.value, null, 2);
+  const dataBlob = new Blob([dataStr], { type: 'application/json' });
+  
+  const url = URL.createObjectURL(dataBlob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 onUnmounted(() => {
   if (ws) ws.close();
   
@@ -1554,5 +1865,51 @@ code {
 
 .terminal-output::-webkit-scrollbar-thumb:hover {
   background: #484f58;
+}
+
+/* Estilos para modales de datos de bots */
+.bot-data-files .file-item {
+  transition: all 0.2s ease;
+}
+
+.bot-data-files .file-item:hover {
+  background-color: #f8f9fa;
+  border-color: #007bff !important;
+  transform: translateX(5px);
+}
+
+.data-entry {
+  transition: all 0.2s ease;
+}
+
+.data-entry:hover {
+  background-color: #f8f9fa;
+}
+
+.data-viewer {
+  font-family: 'Courier New', monospace;
+}
+
+.json-viewer pre {
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+/* Animaciones para badges */
+.badge {
+  transition: all 0.2s ease;
+}
+
+.badge:hover {
+  transform: scale(1.05);
+}
+
+/* Mejora para botones pequeños */
+.btn-sm {
+  transition: all 0.2s ease;
+}
+
+.btn-sm:hover {
+  transform: translateY(-1px);
 }
 </style>

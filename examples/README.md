@@ -15,16 +15,36 @@ Esta carpeta contiene ejemplos de implementación para desarrolladores que quier
 - ✅ Ejemplos de acciones (screenshot, status)
 - ✅ Validación automática de parámetros
 
+### `data-logger-bot.js`
+**Bot de ejemplo que envía información genérica** al servidor Bot Commander para demostrar el sistema de logging y monitoreo.
+
+**Características:**
+- ✅ Envío de mensajes genéricos con diferentes categorías
+- ✅ Generación automática de datos de prueba
+- ✅ Múltiples tipos de información: métricas del sistema, eventos, errores, etc.
+- ✅ Demostración completa del sistema de datos de bots
+- ✅ Configuración automática desde bot-keys.json
+
+**Tipos de datos que genera:**
+- 📊 Métricas del sistema (CPU, memoria, red)
+- 📋 Logs de eventos del sistema
+- 🔍 Información de procesos
+- 🌐 Estadísticas de red
+- 📁 Operaciones de archivos
+- 👤 Actividad de usuarios
+- ❌ Reportes de errores
+- ⚙️ Cambios de configuración
+
 **Uso:**
 ```bash
-# Instalar dependencias
+# 1. Registrar el bot primero
+npm run register-bot data_logger_bot
+
+# 2. Instalar dependencias
 npm install ws
 
-# Ejecutar ejemplo
-node examples/bot-client.js
-
-# O usar como base para tu bot
-cp examples/bot-client.js my-bot/bot.js
+# 3. Ejecutar el bot de ejemplo
+node examples/data-logger-bot.js
 ```
 
 ## Cómo Usar los Ejemplos
@@ -34,14 +54,21 @@ cp examples/bot-client.js my-bot/bot.js
 1. **Copia el archivo base:**
    ```bash
    cp examples/bot-client.js my-project/bot.js
+   # O para bots con datos genéricos:
+   cp examples/data-logger-bot.js my-project/data-bot.js
    ```
 
-2. **Personaliza las acciones:**
+2. **Personaliza las acciones (bot-client.js):**
    - Modifica el método `setupActions()`
    - Implementa tus acciones específicas
    - Agrega validaciones necesarias
 
-3. **Configura tu bot:**
+3. **Personaliza los datos (data-logger-bot.js):**
+   - Modifica los métodos `generate*()` para tus tipos de datos
+   - Ajusta las categorías y prioridades
+   - Personaliza la frecuencia de envío
+
+4. **Configura tu bot:**
    ```javascript
    const bot = new BotClient({
      botName: 'MiBot',

@@ -1,0 +1,228 @@
+# Bot Commander - Reglas y Convenciones del Proyecto
+
+## 📝 Reglas de Commits
+
+### Formato de Mensajes
+```
+<tipo>: <descripción corta>
+
+<descripción detallada opcional>
+
+🚀 Implementaciones principales:
+- Lista de cambios principales
+
+📝 Mejoras específicas:
+- Detalles técnicos
+- Funcionalidades agregadas
+
+🔧 Correcciones técnicas:
+- Bugs corregidos
+- Optimizaciones
+```
+
+### Tipos de Commit
+- `feat`: Nueva funcionalidad
+- `fix`: Corrección de bugs
+- `refactor`: Refactorización de código
+- `style`: Cambios de formato/estilo
+- `docs`: Actualización de documentación
+- `test`: Agregar o modificar tests
+- `chore`: Tareas de mantenimiento
+
+### Límites
+- **Línea de asunto**: Máximo 80 caracteres
+- **Cuerpo del mensaje**: Máximo 120 caracteres por línea
+- **Usar emojis** para categorizar cambios principales
+
+### Ejemplos
+```
+feat: Sistema PTY multibot con terminal optimizado
+
+🚀 Implementaciones principales:
+- Sistema PTY multi-bot con sesiones persistentes
+- Terminal optimizado para comandos como htop
+
+fix: Corrección de sintaxis CSS en terminal
+
+🔧 Correcciones técnicas:
+- Eliminada llave duplicada en #terminal-content
+- Mejorado manejo de errores en formateo ANSI
+```
+
+## 📁 Estructura de Archivos
+
+### Convenciones de Nombres
+- **Archivos**: `kebab-case` (ej: `bot-commander.js`)
+- **Componentes Vue**: `PascalCase` (ej: `BotTerminal.vue`)
+- **Funciones**: `camelCase` (ej: `handlePtyMessage`)
+- **Variables**: `camelCase` (ej: `terminalSessionId`)
+- **Constantes**: `UPPER_SNAKE_CASE` (ej: `MAX_TERMINAL_LINES`)
+
+### Organización
+```
+bot_comander/
+├── backend/
+│   ├── src/
+│   │   ├── handlers/          # Manejadores WebSocket
+│   │   ├── middleware/        # Middleware Express
+│   │   └── utils/            # Utilidades compartidas
+├── frontend/
+│   ├── src/
+│   │   ├── components/       # Componentes Vue reutilizables
+│   │   ├── utils/           # Utilidades del frontend
+│   │   └── styles/          # Estilos globales
+├── scripts/                 # Scripts de automatización
+├── test/                   # Tests unitarios e integración
+└── docs/                   # Documentación del proyecto
+```
+
+## 🎨 Estándares de Código
+
+### JavaScript/Vue
+- **Indentación**: 2 espacios
+- **Comillas**: Simples (`'`) para strings
+- **Semicolons**: Obligatorios
+- **Longitud de línea**: Máximo 120 caracteres
+- **Nombres descriptivos**: Variables y funciones autoexplicativas
+
+### CSS
+- **Metodología**: BEM para clases CSS
+- **Prefijos**: Usar `terminal-`, `bot-`, `panel-` según contexto
+- **Colores**: Usar variables CSS para tema consistente
+- **Responsive**: Mobile-first approach
+
+### Comentarios
+```javascript
+// Comentario de línea simple
+/* 
+ * Comentario de bloque para explicaciones complejas
+ * Múltiples líneas cuando sea necesario
+ */
+
+/**
+ * JSDoc para funciones importantes
+ * @param {string} sessionId - ID de la sesión PTY
+ * @param {object} data - Datos del mensaje
+ * @returns {boolean} - True si el proceso fue exitoso
+ */
+```
+
+## 📋 Documentación
+
+### README.md
+- **Título y descripción** clara del proyecto
+- **Requisitos** del sistema
+- **Instalación** paso a paso
+- **Configuración** de variables de entorno
+- **Uso** con ejemplos prácticos
+- **API** documentada con endpoints
+- **Troubleshooting** para problemas comunes
+
+### Archivos Específicos
+- `PROTOCOL.md`: Documentación del protocolo WebSocket
+- `SECURITY.md`: Directrices de seguridad
+- `ARCHITECTURE.md`: Arquitectura del sistema
+- `CHANGELOG.md`: Historial de cambios por versión
+
+### Comentarios en Código
+- **Funciones complejas**: Explicar lógica y propósito
+- **Algoritmos**: Documentar pasos importantes
+- **APIs externas**: Documentar integraciones
+- **TODOs**: Formato `// TODO: Descripción de tarea pendiente`
+
+## 🔒 Seguridad
+
+### Variables de Entorno
+- **Nunca commitear** archivos `.env` con credenciales reales
+- **Usar** `.env.example` para plantillas
+- **Rotar** secrets regularmente
+- **Validar** todas las entradas del usuario
+
+### Autenticación
+- **JWT tokens** con expiración apropiada
+- **Bcrypt** para hash de contraseñas
+- **Rate limiting** en endpoints sensibles
+- **CORS** configurado correctamente
+
+## 🧪 Testing
+
+### Cobertura
+- **Mínimo 80%** de cobertura de código
+- **Tests unitarios** para funciones críticas
+- **Tests de integración** para APIs
+- **Tests E2E** para flujos principales
+
+### Convenciones
+- **Archivos**: `*.test.js` o `*.spec.js`
+- **Describe**: Funcionalidad que se está probando
+- **It**: Comportamiento específico esperado
+- **Arrange-Act-Assert**: Estructura de tests
+
+## ⚡ Performance
+
+### Frontend
+- **Lazy loading** para componentes grandes
+- **Debounce** en inputs de búsqueda
+- **Límites de líneas** en terminales (máximo 50 activas)
+- **Limpieza de listeners** en `onUnmounted`
+
+### Backend
+- **Connection pooling** para WebSocket
+- **Rate limiting** para prevenir spam
+- **Timeouts apropiados** para comandos PTY
+- **Logging estructurado** para debugging
+
+## 🚀 Deployment
+
+### Ambientes
+- **development**: Vite dev server + hot reload
+- **production**: Build estático servido por Express
+- **testing**: Ambiente aislado para pruebas
+
+### Variables de Entorno
+```bash
+# Desarrollo
+NODE_ENV=development
+SERVE_FRONTEND_MODE=development
+
+# Producción
+NODE_ENV=production
+SERVE_FRONTEND_MODE=production
+```
+
+## 📊 Monitoreo
+
+### Logs
+- **Formato estructurado**: JSON con timestamp, level, message
+- **Niveles**: error, warn, info, debug
+- **Rotación** de archivos de log
+- **Alertas** para errores críticos
+
+### Métricas
+- **Conexiones WebSocket** activas
+- **Sesiones PTY** por bot
+- **Tiempo de respuesta** de comandos
+- **Uso de memoria** en sesiones largas
+
+---
+
+## 🤝 Contribución
+
+1. **Fork** del repositorio
+2. **Branch** para feature: `git checkout -b feature/nueva-funcionalidad`
+3. **Commits** siguiendo las reglas establecidas
+4. **Pull Request** con descripción detallada
+5. **Code Review** requerido antes de merge
+6. **Tests** deben pasar antes de merge
+
+## ❓ Soporte
+
+- **Issues**: Usar templates específicos para bugs y features
+- **Discussions**: Para preguntas generales y propuestas
+- **Wiki**: Documentación adicional y tutoriales
+- **Slack/Discord**: Comunicación en tiempo real del equipo
+
+---
+
+*Última actualización: 3 de agosto de 2025*
+*Versión de reglas: 1.0*

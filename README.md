@@ -148,6 +148,58 @@ El sistema distingue entre dos tipos de clientes:
 
 Bot Commander utiliza un protocolo WebSocket completo para la comunicación entre bots y paneles de control.
 
+### Sistema de Registro de Datos de Bots
+
+Bot Commander incluye un sistema completo para el registro y almacenamiento de información genérica enviada por los bots:
+
+#### Funcionalidades:
+- 📊 **Almacenamiento en memoria**: Los datos se guardan temporalmente en memoria para acceso rápido
+- 💾 **Persistencia automática**: Los datos se guardan automáticamente en archivos JSON por intervalo configurable
+- 📁 **Organización por bot y fecha**: Un archivo JSON por bot por día (ej: `bot_name_2025-01-01.json`)
+- 🔍 **Interfaz de consulta**: Panel web para explorar los datos de cada bot
+- 📥 **Descarga de datos**: Posibilidad de descargar los archivos JSON
+
+#### Configuración:
+En el archivo `.env`, puedes configurar:
+```bash
+# Intervalo en minutos para guardar datos (default: 5)
+BOT_DATA_SAVE_INTERVAL=5
+```
+
+#### Directorio de datos:
+Los archivos se almacenan en el directorio `bot_data/` en la raíz del proyecto:
+```
+bot_data/
+├── bot1_2025-01-01.json
+├── bot1_2025-01-02.json
+├── bot2_2025-01-01.json
+└── bot2_2025-01-02.json
+```
+
+#### Uso desde bots:
+Los bots pueden enviar información usando mensajes genéricos:
+```javascript
+ws.send(JSON.stringify({
+  type: 'generic_message',
+  category: 'monitoring',
+  priority: 'normal',
+  payload: {
+    title: 'Métricas del Sistema',
+    cpu_usage: 45.2,
+    memory_usage: 68.1
+  },
+  metadata: {
+    source: 'system_monitor'
+  }
+}));
+```
+
+#### Acceso desde el panel:
+- Cada tarjeta de bot incluye un botón **"Datos"**
+- Al hacer clic se abre un modal con la lista de archivos por fecha
+- Hacer clic en una fecha abre el contenido con vista formateada o JSON
+- Opción de descarga del archivo completo
+
 **📋 Documentación Completa**: Ver [`PROTOCOL.md`](./PROTOCOL.md) para:
 - Especificación completa de tipos de mensajes
 - Códigos de error estándar y estados de bot

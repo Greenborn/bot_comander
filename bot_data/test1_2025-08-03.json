@@ -1,0 +1,44 @@
+[
+  {
+    "timestamp": 1754193523794,
+    "data": {
+      "type": "generic_message",
+      "category": "testing",
+      "priority": "normal",
+      "payload": {
+        "action": "test_action",
+        "parameters": {
+          "testParam": "valor_de_prueba",
+          "timestamp": 1754193523793
+        }
+      },
+      "metadata": {
+        "source": "test_client",
+        "userId": "test_user",
+        "timestamp": 1754193523793
+      },
+      "botName": "test1"
+    }
+  },
+  {
+    "timestamp": 1754193591194,
+    "data": {
+      "type": "generic_message",
+      "category": "testing",
+      "priority": "normal",
+      "payload": {
+        "action": "test_action",
+        "parameters": {
+          "testParam": "valor_de_prueba",
+          "timestamp": 1754193591193
+        }
+      },
+      "metadata": {
+        "source": "test_client",
+        "userId": "test_user",
+        "timestamp": 1754193591193
+      },
+      "botName": "test1"
+    }
+  }
+]
