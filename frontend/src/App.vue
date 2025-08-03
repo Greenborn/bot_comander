@@ -571,8 +571,6 @@ function initializeWebSocket() {
 // Console functions - ahora con PTY
 function openConsole(bot) {
   selectedBot.value = bot;
-  commandHistory.value = [];
-  commandInput.value = '';
   
   // Inicializar PTY
   terminalSessionId.value = null;

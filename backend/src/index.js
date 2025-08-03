@@ -9,6 +9,7 @@ import fs from 'fs';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import rateLimit from 'express-rate-limit';
+import cors from 'cors';
 
 dotenv.config({ path: '../.env' });
 
@@ -170,6 +171,31 @@ function buildFrontend() {
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
+
+// Configurar CORS
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Permitir sin origin (para aplicaciones móviles, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      'http://localhost:5173', // Vite dev server
+      'http://localhost:8080', // Producción en el mismo puerto
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:8080'
+    ];
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`CORS: Origen no permitido: ${origin}`);
+      callback(null, true); // Por ahora permitir todos en desarrollo
+    }
+  },
+  credentials: true
+};
+
+app.use(cors(corsOptions));
 
 // Middleware para parsear JSON
 app.use(express.json());
