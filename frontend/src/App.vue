@@ -652,7 +652,10 @@ async function handleSendZip() {
     formData.append('botId', zipTargetBot.value.id);
     const response = await fetch(`${import.meta.env.VITE_API_URL}/api/send-zip`, {
       method: 'POST',
-      body: formData
+      body: formData,
+      headers: {
+        Authorization: `Bearer ${authToken}`
+      }
     });
     if (response.ok) {
       zipSendSuccess.value = true;
