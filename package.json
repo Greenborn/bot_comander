@@ -18,7 +18,7 @@
     "dev:frontend": "vite",
     "dev:backend": "vite",
     "start": "npm run start:production",
-  "start:production": "SERVE_FRONTEND_MODE=production node backend/src/index.js",
+    "start:production": "SERVE_FRONTEND_MODE=production node backend/src/index.js",
     "start:development": "SERVE_FRONTEND_MODE=development cd backend && npm start",
     "build": "vite build",
     "serve": "vite preview"
@@ -36,6 +36,13 @@
   "homepage": "https://github.com/Greenborn/bot_comander#readme",
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "bootstrap": "^5.3.7",
+    "bootstrap-icons": "^1.13.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.0.1",
+    "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
     "ws": "^8.18.3"
   },

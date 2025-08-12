@@ -284,18 +284,7 @@ function setupDevelopmentProxy() {
   app.get('/', (req, res) => {
     res.redirect('http://localhost:5173');
   });
-  
-  // Servir archivos de la API pero redirigir todo lo demás a Vite
-  app.get('*', (req, res, next) => {
-    // Si es una ruta de API, continuar normalmente
-    if (req.path.startsWith('/api')) {
-      next();
-      return;
-    }
-    
-    // Para cualquier otra ruta, redirigir a Vite dev server
-    res.redirect(`http://localhost:5173${req.path}`);
-  });
+  // Wildcard route removed to avoid conflicts with parameterized API routes
 }
 
 // Configurar servido estático para producción
@@ -305,13 +294,8 @@ function setupProductionStatic() {
   app.use(express.static(frontendDistPath));
   
   // Servir el index.html para rutas no API
-  app.get('*', (req, res) => {
-    // Si es una ruta de API, no servir index.html
-    if (req.path.startsWith('/api')) {
-      res.status(404).json({ error: 'Endpoint no encontrado' });
-      return;
-    }
-    
+  // Use regex to match all non-API routes for SPA
+  app.get(/^((?!\/api).)*$/, (req, res) => {
     res.sendFile(path.resolve(frontendDistPath, 'index.html'));
   });
 }
