@@ -66,7 +66,7 @@ import jwt from 'jsonwebtoken';
 import rateLimit from 'express-rate-limit';
 import cors from 'cors';
 
-dotenv.config({ path: '../.env' });
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -378,7 +378,7 @@ app.post('/api/send-zip', authenticateToken, upload.single('zip'), async (req, r
     
     // Ejecutar npm run build en el directorio del frontend
     const buildProcess = exec('npm run build', { 
-      cwd: frontendPath,
+      cwd: path.resolve(__dirname, '../../'),
       stdio: 'inherit'
     }, (error, stdout, stderr) => {
       if (error) {

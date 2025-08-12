@@ -15,12 +15,13 @@
     "delete-bot": "node scripts/manage-bot-keys.js delete",
     "dev": "npm run dev:parallel",
     "dev:parallel": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
-    "dev:frontend": "cd frontend && npm run dev",
-    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "vite",
+    "dev:backend": "vite",
     "start": "npm run start:production",
-    "start:production": "SERVE_FRONTEND_MODE=production cd backend && npm start",
+  "start:production": "SERVE_FRONTEND_MODE=production node backend/src/index.js",
     "start:development": "SERVE_FRONTEND_MODE=development cd backend && npm start",
-    "build": "cd frontend && npm run build"
+    "build": "vite build",
+    "serve": "vite preview"
   },
   "repository": {
     "type": "git",
@@ -39,6 +40,8 @@
     "ws": "^8.18.3"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "@vitejs/plugin-vue": "^6.0.1",
+    "concurrently": "^8.2.2",
+    "vite": "^7.1.2"
   }
 }
