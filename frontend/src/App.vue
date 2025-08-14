@@ -205,7 +205,12 @@
                           </p>
                           <p class="card-text">
                             <strong>IPv4:</strong> <span>{{ bot.ipv4 || 'N/A' }}</span><br>
-                            <strong>IPv6:</strong> <span>{{ bot.ipv6 || 'N/A' }}</span>
+                            <strong>IPv6:</strong> <span>{{ bot.ipv6 || 'N/A' }}</span><br>
+                            <strong>Espacio libre:</strong>
+                            <span v-if="bot.status && bot.status.systemInfo && typeof bot.status.systemInfo.diskFree === 'number'">
+                              {{ formatFileSize(bot.status.systemInfo.diskFree) }}
+                            </span>
+                            <span v-else class="text-muted">N/A</span>
                           </p>
                           <p class="card-text">
                             <strong>Conectado:</strong><br>
@@ -1686,6 +1691,94 @@ onUnmounted(() => {
 });
 </script>
 
+import { v4 as uuidv4 } from 'uuid';
+// ...existing code...
+export default {
+  // ...existing code...
+  data() {
+    return {
+      // ...existing code...
+      pendingMetricsRequests: {},
+    };
+  },
+  methods: {
+    // ...existing code...
+    formatFileSize,
+    // Enviar solicitud de métricas al bot
+    requestBotMetrics(bot) {
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+      const requestId = uuidv4();
+      this.pendingMetricsRequests[bot.id] = requestId;
+      this.ws.send(JSON.stringify({
+        type: 'generic_message',
+        targetBot: bot.id,
+        category: 'monitoring',
+        priority: 'normal',
+        expectResponse: true,
+        requestId,
+        payload: {
+          action: 'get_system_metrics',
+          parameters: {
+            include: ['cpu', 'memory', 'disk', 'diskFree'],
+            interval: '5m'
+          }
+        },
+        metadata: {
+          source: 'admin_panel',
+          userId: this.username || 'admin',
+          timestamp: Date.now()
+        }
+      }));
+    },
+    // Procesar respuesta de métricas
+    handleBotMetricsResponse(msg) {
+      if (msg.type === 'generic_message_response' && msg.payload && msg.payload.system_metrics) {
+        const botId = Object.keys(this.pendingMetricsRequests).find(id => this.pendingMetricsRequests[id] === msg.requestId);
+        if (botId) {
+          const bot = this.bots.find(b => b.id === botId);
+          if (bot) {
+            if (!bot.status) bot.status = {};
+            if (!bot.status.systemInfo) bot.status.systemInfo = {};
+            bot.status.systemInfo.diskFree = msg.payload.system_metrics.diskFree || null;
+            // Puedes actualizar otros campos si lo deseas
+          }
+          delete this.pendingMetricsRequests[botId];
+        }
+      }
+    },
+    // ...existing code...
+  },
+  mounted() {
+      // Solicitar métricas a cada bot conectado al cargar
+      this.$nextTick(() => {
+        this.bots.forEach(bot => {
+          this.requestBotMetrics(bot);
+        });
+      });
+      // Escuchar mensajes WebSocket para respuestas de métricas y actualizaciones de clientes
+      if (this.ws) {
+        this.ws.addEventListener('message', event => {
+          try {
+            const msg = JSON.parse(event.data);
+            this.handleBotMetricsResponse(msg);
+            // Procesar clients_update para actualizar diskFree
+            if (msg.type === 'clients_update' && Array.isArray(msg.bots)) {
+              msg.bots.forEach(newBot => {
+                const bot = this.bots.find(b => b.id === newBot.id);
+                if (bot && newBot.status && newBot.status.systemInfo && typeof newBot.status.systemInfo.diskFree === 'number') {
+                  if (!bot.status) bot.status = {};
+                  if (!bot.status.systemInfo) bot.status.systemInfo = {};
+                  bot.status.systemInfo.diskFree = newBot.status.systemInfo.diskFree;
+                }
+              });
+            }
+          } catch (e) {}
+        });
+      }
+      // ...existing code...
+  },
+  // ...existing code...
+}
 <style scoped>
 .border-left-primary {
   border-left: 4px solid #007bff !important;

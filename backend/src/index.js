@@ -456,17 +456,27 @@ const clients = {};
 function broadcastBotsList() {
   const bots = Object.entries(clients)
     .filter(([id, data]) => data.type === 'bot')
-    .map(([id, data]) => ({
-      id,
-      username: data.username,
-      botName: data.botName,
-      connectedAt: data.connectedAt,
-      type: data.type,
-      lastActivity: data.lastActivity || data.connectedAt,
-      authenticated: data.authenticated || false,
-      ipv4: data.ipv4,
-      ipv6: data.ipv6
-    }));
+    .map(([id, data]) => {
+      const botObj = {
+        id,
+        username: data.username,
+        botName: data.botName,
+        connectedAt: data.connectedAt,
+        type: data.type,
+        lastActivity: data.lastActivity || data.connectedAt,
+        authenticated: data.authenticated || false,
+        ipv4: data.ipv4,
+        ipv6: data.ipv6
+      };
+      // Incluir status y systemInfo si existen
+      if (data.status) {
+        botObj.status = data.status;
+        if (data.status.systemInfo) {
+          botObj.status.systemInfo = data.status.systemInfo;
+        }
+      }
+      return botObj;
+    });
     
   const panels = Object.entries(clients)
     .filter(([id, data]) => data.type === 'panel')
@@ -604,6 +614,9 @@ wss.on('connection', (ws, req) => {
       // Manejar heartbeat de bots
       if (message.type === 'heartbeat' && clients[clientId].type === 'bot') {
         clients[clientId].lastActivity = Date.now();
+        if (message.status) {
+          clients[clientId].status = message.status;
+        }
         ws.send(JSON.stringify({ type: 'heartbeat_ack' }));
       }
       
