@@ -503,7 +503,16 @@ wss.on('connection', (ws, req) => {
   // Obtener direcciones IP del socket
   let ipv4 = null;
   let ipv6 = null;
-  if (req && req.socket && req.socket.remoteAddress) {
+  // Detectar IP pública si hay proxy
+  if (req && req.headers && req.headers['x-forwarded-for']) {
+    // Puede ser una lista de IPs, tomar la primera
+    const forwarded = req.headers['x-forwarded-for'].split(',')[0].trim();
+    if (forwarded.includes(':')) {
+      ipv6 = forwarded;
+    } else {
+      ipv4 = forwarded;
+    }
+  } else if (req && req.socket && req.socket.remoteAddress) {
     if (req.socket.remoteFamily === 'IPv4') {
       ipv4 = req.socket.remoteAddress;
     } else if (req.socket.remoteFamily === 'IPv6') {
