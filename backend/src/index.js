@@ -463,7 +463,9 @@ function broadcastBotsList() {
       connectedAt: data.connectedAt,
       type: data.type,
       lastActivity: data.lastActivity || data.connectedAt,
-      authenticated: data.authenticated || false
+      authenticated: data.authenticated || false,
+      ipv4: data.ipv4,
+      ipv6: data.ipv6
     }));
     
   const panels = Object.entries(clients)
@@ -498,11 +500,23 @@ wss.on('connection', (ws, req) => {
   const clientId = Date.now() + Math.random().toString(36).substr(2, 9);
   
   // Inicializar cliente sin tipo definido
+  // Obtener direcciones IP del socket
+  let ipv4 = null;
+  let ipv6 = null;
+  if (req && req.socket && req.socket.remoteAddress) {
+    if (req.socket.remoteFamily === 'IPv4') {
+      ipv4 = req.socket.remoteAddress;
+    } else if (req.socket.remoteFamily === 'IPv6') {
+      ipv6 = req.socket.remoteAddress;
+    }
+  }
   clients[clientId] = { 
     ws, 
     connectedAt: Date.now(),
     type: null,
-    lastActivity: Date.now()
+    lastActivity: Date.now(),
+    ipv4,
+    ipv6
   };
 
   console.log(`Nueva conexión: ${clientId}`);

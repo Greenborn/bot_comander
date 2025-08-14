@@ -204,6 +204,10 @@
                             <code class="text-primary">{{ bot.id.slice(-8) }}</code>
                           </p>
                           <p class="card-text">
+                            <strong>IPv4:</strong> <span>{{ bot.ipv4 || 'N/A' }}</span><br>
+                            <strong>IPv6:</strong> <span>{{ bot.ipv6 || 'N/A' }}</span>
+                          </p>
+                          <p class="card-text">
                             <strong>Conectado:</strong><br>
                             <small class="text-muted">
                               <i class="bi bi-clock"></i>
