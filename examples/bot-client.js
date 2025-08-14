@@ -668,10 +668,20 @@ class BotClient {
    * Obtener información del sistema
    */
   getSystemInfo() {
+    const diskFree = (() => {
+      try {
+        const diskusage = require('diskusage');
+        const info = diskusage.checkSync('/');
+        return info.free;
+      } catch (e) {
+        return null;
+      }
+    })();
     return {
       cpu: Math.random() * 100, // Implementar medición real
       memory: (process.memoryUsage().heapUsed / process.memoryUsage().heapTotal) * 100,
-      uptime: process.uptime() * 1000
+      uptime: process.uptime() * 1000,
+      diskFree
     };
   }
 
