@@ -166,5 +166,86 @@ const localInput = ref('');
 </script>
 
 <style scoped>
+/* Estilos terminal y modal migrados desde App.vue */
+.terminal-container {
+  border: 1px solid #30363d;
+  border-radius: 6px;
+}
+.terminal-toolbar {
+  border-bottom: 1px solid #30363d;
+}
+.terminal-output {
+  background-color: #0d1117 !important;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
+  font-size: 13px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  max-height: 400px;
+  overflow-y: auto;
+}
+.terminal-line {
+  margin-bottom: 1px;
+  line-height: 1.2;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  display: block;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+#terminal-content {
+  scrollbar-width: thin;
+  scrollbar-color: #666 #0d1117;
+  overflow-x: auto;
+  overflow-y: auto;
+}
+#terminal-content div {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+#terminal-content::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+#terminal-content::-webkit-scrollbar-track {
+  background: #0d1117;
+}
+#terminal-content::-webkit-scrollbar-thumb {
+  background: #666;
+  border-radius: 4px;
+}
+#terminal-content::-webkit-scrollbar-thumb:hover {
+  background: #888;
+}
+.terminal-input-field {
+  background-color: #161b22 !important;
+  border-color: #30363d !important;
+  color: #f0f6fc !important;
+  font-family: 'Courier New', monospace !important;
+}
+.terminal-input-field:focus {
+  background-color: #161b22 !important;
+  border-color: #58a6ff !important;
+  color: #f0f6fc !important;
+  box-shadow: 0 0 0 0.25rem rgba(88, 166, 255, 0.25);
+}
+.terminal-input-field::placeholder {
+  color: #7d8590;
+}
+.terminal-output::-webkit-scrollbar {
+  width: 8px;
+}
+.terminal-output::-webkit-scrollbar-track {
+  background: #21262d;
+}
+.terminal-output::-webkit-scrollbar-thumb {
+  background: #30363d;
+  border-radius: 4px;
+}
+.terminal-output::-webkit-scrollbar-thumb:hover {
+  background: #484f58;
+}
 /* Puedes copiar los estilos relevantes del App.vue aquí si lo deseas */
 </style>
