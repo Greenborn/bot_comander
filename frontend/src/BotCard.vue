@@ -84,50 +84,37 @@
 
 <FileExplorerModal v-if="showFileExplorerModal" :bot="bot" @close="showFileExplorerModal = false" />
 
-<script>
+
+<script setup>
+import { ref, computed } from 'vue';
 import FileExplorerModal from './FileExplorerModal.vue';
 
-export default {
-  name: 'BotCard',
-  props: {
-    bot: {
-      type: Object,
-      required: true
-    }
-  },
-  data() {
-    return {
-      showFileExplorerModal: false
-    };
-  },
-  data() {
-    return {
-      showFileExplorerModal: false
-    };
-  },
-  computed: {
-    hasActiveTerminalSession() {
-      // El padre debe pasar esta prop si lo desea, por defecto false
-      return this.bot.hasActiveTerminalSession || false;
-    }
-  },
-  components: {
-    FileExplorerModal
-  },
-  methods: {
-    formatFileSize(bytes) {
-      if (bytes === 0) return '0 Bytes';
-      const k = 1024;
-      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-      const i = Math.floor(Math.log(bytes) / Math.log(k));
-      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    },
-    formatDate(dateString) {
-      if (!dateString) return 'N/A';
-      const date = new Date(dateString);
-      return date.toLocaleString('es-ES');
-    }
+const props = defineProps({
+  bot: {
+    type: Object,
+    required: true
   }
+});
+
+const showFileExplorerModal = ref(false);
+
+const hasActiveTerminalSession = computed(() => {
+  // El padre debe pasar esta prop si lo desea, por defecto false
+  return props.bot.hasActiveTerminalSession || false;
+});
+
+function formatFileSize(bytes) {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function formatDate(dateString) {
+  if (!dateString) return 'N/A';
+  const date = new Date(dateString);
+  return date.toLocaleString('es-ES');
 }
 </script>
 
