@@ -23,93 +23,91 @@
   </div>
 </template>
 
-<script>
+
+<script setup>
+import { ref, onMounted } from 'vue';
 import { useWebSocket } from './useWebSocket.js';
 
-export default {
-  name: 'FileExplorerModal',
-  props: {
-    bot: { type: Object, required: true }
-  },
-  data() {
-    return {
-      items: [],
-      currentPath: '/',
-      loading: false
-    };
-  },
-  mounted() {
-    this.fetchItems('/');
-  },
-  methods: {
-    fetchItems(path) {
-      this.loading = true;
-      const { sendMessage } = useWebSocket(import.meta.env.VITE_WS_URL);
-      const requestId = 'ls_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-      sendMessage({
-        type: 'system_command',
-        targetBot: this.bot.id,
-        command: `ls -la ${path}`,
-        from: 'panel',
-        requestId
-      }, (response) => {
-        if (response.success && response.output) {
-          this.items = this.parseLsOutput(response.output, path);
-          this.currentPath = path;
-        } else {
-          this.items = [];
-        }
-        this.loading = false;
-      });
-    },
-    handleClick(item) {
-      if (item.type === 'folder') {
-        this.fetchItems(item.path);
-      } else {
-        this.downloadFile(item.path, item.name);
-      }
-    },
-    downloadFile(path, filename) {
-      const { sendMessage } = useWebSocket(import.meta.env.VITE_WS_URL);
-      const requestId = 'dl_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-      sendMessage({
-        type: 'system_command',
-        targetBot: this.bot.id,
-        command: 'read_file_base64',
-        parameters: { path },
-        from: 'panel',
-        requestId
-      }, (response) => {
-        if (response.success && response.output) {
-          const link = document.createElement('a');
-          link.href = 'data:application/octet-stream;base64,' + response.output;
-          link.download = filename;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-        }
-      });
-    },
-    parseLsOutput(output, currentPath) {
-      // Parsear salida de ls -la en formato texto
-      const lines = output.split('\n').filter(l => l.trim() && !l.includes('total'));
-      const items = [];
-      for (const line of lines) {
-        const parts = line.split(/\s+/);
-        if (parts.length < 9) continue;
-        const name = parts.slice(8).join(' ');
-        if (name === '.' || name === '..') continue;
-        const type = line[0] === 'd' ? 'folder' : 'file';
-        items.push({
-          name,
-          type,
-          path: currentPath === '/' ? name : currentPath.replace(/\/$/, '') + '/' + name
-        });
-      }
-      return items;
-    }
+const props = defineProps({
+  bot: { type: Object, required: true }
+});
+
+const items = ref([]);
+const currentPath = ref('/');
+const loading = ref(false);
+
+function parseLsOutput(output, currentPathValue) {
+  const lines = output.split('\n').filter(l => l.trim() && !l.includes('total'));
+  const result = [];
+  for (const line of lines) {
+    const parts = line.split(/\s+/);
+    if (parts.length < 9) continue;
+    const name = parts.slice(8).join(' ');
+    if (name === '.' || name === '..') continue;
+    const type = line[0] === 'd' ? 'folder' : 'file';
+    result.push({
+      name,
+      type,
+      path: currentPathValue === '/' ? name : currentPathValue.replace(/\/$/, '') + '/' + name
+    });
   }
-};
+  return result;
+}
+
+function fetchItems(path) {
+  loading.value = true;
+  const { sendMessage } = useWebSocket(import.meta.env.VITE_WS_URL);
+  const requestId = 'ls_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+  sendMessage({
+    type: 'system_command',
+    targetBot: props.bot.id,
+    command: `ls -la ${path}`,
+    from: 'panel',
+    requestId
+  }, (response) => {
+    if (response.success && response.output) {
+      items.value = parseLsOutput(response.output, path);
+      currentPath.value = path;
+    } else {
+      items.value = [];
+    }
+    loading.value = false;
+  });
+}
+
+function handleClick(item) {
+  if (item.type === 'folder') {
+    fetchItems(item.path);
+  } else {
+    downloadFile(item.path, item.name);
+  }
+}
+
+function downloadFile(path, filename) {
+  const { sendMessage } = useWebSocket(import.meta.env.VITE_WS_URL);
+  const requestId = 'dl_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+  sendMessage({
+    type: 'system_command',
+    targetBot: props.bot.id,
+    command: 'read_file_base64',
+    parameters: { path },
+    from: 'panel',
+    requestId
+  }, (response) => {
+    if (response.success && response.output) {
+      const link = document.createElement('a');
+      link.href = 'data:application/octet-stream;base64,' + response.output;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  });
+}
+
+onMounted(() => {
+  fetchItems('/');
+});
 </script>
 
 <style scoped>

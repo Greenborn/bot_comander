@@ -43,31 +43,30 @@
   </div>
 </template>
 
-<script>
-export default {
-  name: 'SendZipModal',
-  props: {
-    show: Boolean,
-    bot: Object,
-    sendingZip: Boolean,
-    zipSendError: String,
-    zipSendSuccess: Boolean,
-    selectedZipFile: File
-  },
-  methods: {
-    onZipFileChange(event) {
-      const file = event.target.files[0];
-      if (file && file.name.endsWith('.zip')) {
-        this.$emit('select-zip', file);
-      } else {
-        this.$emit('select-zip', null);
-        this.$emit('zip-error', 'Solo se permiten archivos .zip.');
-      }
-    },
-    handleSendZip() {
-      this.$emit('send-zip');
-    }
+
+<script setup>
+const emit = defineEmits(['close', 'select-zip', 'zip-error', 'send-zip']);
+const props = defineProps({
+  show: Boolean,
+  bot: Object,
+  sendingZip: Boolean,
+  zipSendError: String,
+  zipSendSuccess: Boolean,
+  selectedZipFile: File
+});
+
+function onZipFileChange(event) {
+  const file = event.target.files[0];
+  if (file && file.name.endsWith('.zip')) {
+    emit('select-zip', file);
+  } else {
+    emit('select-zip', null);
+    emit('zip-error', 'Solo se permiten archivos .zip.');
   }
+}
+
+function handleSendZip() {
+  emit('send-zip');
 }
 </script>
 
