@@ -380,125 +380,30 @@
     </div>
   </div>
 
-  <!-- Modal para Datos de Bot -->
-  <div v-if="selectedBot && !selectedDataFile" class="modal fade show" style="display: block; background: rgba(0,0,0,0.5);" tabindex="-1" aria-labelledby="botDataModalLabel" aria-modal="true" role="dialog">
-    <div class="modal-dialog modal-lg">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="botDataModalLabel">
-            <i class="bi bi-database"></i>
-            Datos de {{ selectedBot?.botName || 'Bot' }}
-          </h5>
-          <button type="button" class="btn-close" @click="selectedBot = null" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <div v-if="loadingBotData" class="text-center py-4">
-            <div class="spinner-border text-primary" role="status">
-              <span class="visually-hidden">Cargando...</span>
-            </div>
-            <p class="mt-2">Cargando archivos de datos...</p>
-          </div>
-          
-          <div v-else-if="botDataError" class="alert alert-danger">
-            <i class="bi bi-exclamation-triangle"></i>
-            {{ botDataError }}
-          </div>
-          
-          <div v-else>
-            <h6>
-              <i class="bi bi-folder2-open"></i>
-              Archivos de datos por día ({{ botDataFiles.length }})
-            </h6>
-            
-            <div v-if="botDataFiles.length === 0" class="text-center py-4">
-              <i class="bi bi-file-earmark-x fs-1 text-muted"></i>
-              <p class="text-muted mt-2">No hay datos disponibles para este bot</p>
-            </div>
-            
-            <div v-else class="bot-data-files">
-              <div 
-                v-for="file in botDataFiles" 
-                :key="file.date"
-                class="file-item d-flex justify-content-between align-items-center p-3 mb-2 border rounded"
-                @click="openDataFile(file)"
-                style="cursor: pointer;"
-              >
-                <div>
-                  <div class="fw-bold">
-                    <i class="bi bi-calendar3"></i>
-                    {{ formatDate(file.date) }}
-                  </div>
-                  <small class="text-muted">
-                    <i class="bi bi-file-earmark-text"></i>
-                    {{ file.file }} • {{ formatFileSize(file.size) }}
-                  </small>
-                </div>
-                <div class="text-end">
-                  <small class="text-muted d-block">
-                    Modificado: {{ new Date(file.modified).toLocaleString() }}
-                  </small>
-                  <i class="bi bi-chevron-right text-primary"></i>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="selectedBot = null">Cerrar</button>
-        </div>
-      </div>
-    </div>
-  </div>
+  <!-- Modal para Datos de Bot migrado a BotDataQuery.vue -->
+  <BotDataQuery v-if="selectedBot" :bot="selectedBot" @close="selectedBot = null" />
 
   <!-- Modal para Enviar ZIP -->
-  <div v-if="showSendZipModal" class="modal fade show" style="display: block; background: rgba(0,0,0,0.5);" tabindex="-1" aria-labelledby="sendZipModalLabel" aria-modal="true" role="dialog">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="sendZipModalLabel">
-            <i class="bi bi-file-earmark-zip"></i>
-            Enviar archivo ZIP a {{ zipTargetBot?.botName || 'Bot' }}
-          </h5>
-          <button type="button" class="btn-close" @click="closeSendZipModal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <form @submit.prevent="handleSendZip">
-            <div class="mb-3">
-              <label for="zipFileInput" class="form-label">Selecciona un archivo .zip</label>
-              <input type="file" class="form-control" id="zipFileInput" accept=".zip" @change="onZipFileChange" :disabled="sendingZip">
-            </div>
-            <div v-if="zipSendError" class="alert alert-danger">
-              <i class="bi bi-exclamation-triangle"></i>
-              {{ zipSendError }}
-            </div>
-            <div v-if="sendingZip" class="text-center py-2">
-              <div class="spinner-border text-success" role="status">
-                <span class="visually-hidden">Enviando...</span>
-              </div>
-              <p class="mt-2">Enviando archivo ZIP...</p>
-            </div>
-            <div v-if="zipSendSuccess" class="alert alert-success">
-              <i class="bi bi-check-circle"></i>
-              Archivo ZIP enviado correctamente.
-            </div>
-            <div class="modal-footer">
-              <button type="submit" class="btn btn-success" :disabled="!selectedZipFile || sendingZip">
-                <i class="bi bi-upload"></i>
-                Enviar ZIP
-              </button>
-              <button type="button" class="btn btn-secondary" @click="closeSendZipModal" :disabled="sendingZip">Cerrar</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  </div>
+  <SendZipModal
+    :show="showSendZipModal"
+    :bot="zipTargetBot"
+    :sendingZip="sendingZip"
+    :zipSendError="zipSendError"
+    :zipSendSuccess="zipSendSuccess"
+    :selectedZipFile="selectedZipFile"
+    @close="closeSendZipModal"
+    @select-zip="selectedZipFile = $event; zipSendError = ''"
+    @zip-error="zipSendError = $event"
+    @send-zip="handleSendZip"
+  />
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
 import BotDetails from './BotDetails.vue';
 import BotCard from './BotCard.vue';
+import SendZipModal from './SendZipModal.vue';
+import BotDataQuery from './BotDataQuery.vue';
 
 const bots = ref([]);
 const panels = ref([]);
@@ -539,16 +444,6 @@ const terminalOutput = ref(null);
 
 // Almacenar sesiones PTY por bot
 const botTerminalSessions = ref(new Map());
-
-// Variables para datos de bots
-const loadingBotData = ref(false);
-const botDataError = ref('');
-const botDataFiles = ref([]);
-const selectedDataFile = ref(null);
-const loadingFileData = ref(false);
-const fileDataError = ref('');
-const fileData = ref([]);
-const dataViewMode = ref('formatted'); // 'formatted' o 'json'
 
 // Variables para envío de ZIP
 const showSendZipModal = ref(false);
@@ -1502,121 +1397,9 @@ function scrollTerminalToBottom() {
   }, 50);
 }
 
-// Funciones para manejo de datos de bots
-async function openBotDataModal(bot) {
+// Función para abrir el modal de datos del bot (ahora delega al componente BotDataQuery)
+function openBotDataModal(bot) {
   selectedBot.value = bot;
-  botDataError.value = '';
-  botDataFiles.value = [];
-  loadingBotData.value = true;
-  
-  try {
-    await loadBotDataFiles(bot.username || bot.botName);
-  } catch (error) {
-    console.error('Error abriendo modal de datos:', error);
-    botDataError.value = 'Error al cargar los datos del bot';
-  } finally {
-    loadingBotData.value = false;
-  }
-}
-
-async function loadBotDataFiles(botName) {
-  try {
-    const response = await fetch(`/api/bot-data/${encodeURIComponent(botName)}/files`, {
-      headers: {
-        'Authorization': `Bearer ${authToken}`
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Error ${response.status}: ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    botDataFiles.value = data.files || [];
-  } catch (error) {
-    console.error('Error cargando archivos de datos:', error);
-    throw error;
-  }
-}
-
-async function openDataFile(file) {
-  // Usar solo el sistema reactivo de Vue para mostrar los modales
-  selectedDataFile.value = file;
-  fileDataError.value = '';
-  fileData.value = [];
-  loadingFileData.value = true;
-  dataViewMode.value = 'formatted';
-  try {
-    const botName = selectedBot.value.username || selectedBot.value.botName;
-    await loadFileData(botName, file.date);
-    // El modal de archivo se mostrará automáticamente por v-if
-  } catch (error) {
-    console.error('Error abriendo archivo:', error);
-    fileDataError.value = 'Error al cargar el contenido del archivo';
-  } finally {
-    loadingFileData.value = false;
-  }
-}
-
-async function loadFileData(botName, date) {
-  try {
-    const response = await fetch(`/api/bot-data/${encodeURIComponent(botName)}/date/${date}`, {
-      headers: {
-        'Authorization': `Bearer ${authToken}`
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Error ${response.status}: ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    fileData.value = data.data || [];
-  } catch (error) {
-    console.error('Error cargando datos del archivo:', error);
-    throw error;
-  }
-}
-
-function formatDate(dateString) {
-  try {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('es-ES', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  } catch (error) {
-    return dateString;
-  }
-}
-
-function formatFileSize(bytes) {
-  if (bytes === 0) return '0 Bytes';
-  
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
-function downloadDataFile() {
-  if (fileData.value.length === 0) return;
-  
-  const filename = `${selectedBot.value.botName || 'bot'}_${selectedDataFile.value.date}.json`;
-  const dataStr = JSON.stringify(fileData.value, null, 2);
-  const dataBlob = new Blob([dataStr], { type: 'application/json' });
-  
-  const url = URL.createObjectURL(dataBlob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
 }
 
 onUnmounted(() => {
