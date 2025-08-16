@@ -80,9 +80,9 @@
       </div>
     </div>
   </div>
-</template>
 
-<FileExplorerModal v-if="showFileExplorerModal" :bot="bot" @close="showFileExplorerModal = false" />
+  <FileExplorerModal v-if="showFileExplorerModal" :bot="bot" @close="showFileExplorerModal = false" />
+</template>
 
 
 <script setup>
@@ -130,8 +130,3 @@ function formatDate(dateString) {
   border-left: 4px solid #007bff !important;
 }
 </style>
-    data() {
-      return {
-        showFileExplorerModal: false
-      };
-    }
