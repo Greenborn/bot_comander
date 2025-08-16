@@ -109,131 +109,25 @@
     </div>
     </div>
 
-    <!-- Console Modal controlado solo por Vue -->
-    <div v-if="selectedBotForConsole" class="modal-backdrop" style="z-index: 1050;"></div>
-    <div v-if="selectedBotForConsole" class="modal show d-block" tabindex="-1" aria-labelledby="consoleModalLabel" aria-modal="true" role="dialog" style="z-index: 1060;">
-      <div class="modal-dialog modal-lg">
-        <div class="modal-content bg-dark text-light">
-          <div class="modal-header border-secondary">
-            <h5 class="modal-title" id="consoleModalLabel">
-              <i class="bi bi-terminal"></i>
-              Consola - {{ selectedBotForConsole?.botName || 'Bot' }}
-            </h5>
-            <button type="button" class="btn-close btn-close-white" @click="selectedBotForConsole = null" aria-label="Close"></button>
-          </div>
-          <div class="modal-body p-0">
-            <div class="terminal-container" style="height: 400px; background-color: #0d1117;">
-              <div 
-                class="terminal-output p-3" 
-                id="terminal-content"
-                style="height: 350px; overflow-x: auto; overflow-y: auto; font-family: 'Consolas', 'Monaco', 'Courier New', monospace; font-size: 12px; line-height: 1.2; white-space: pre-wrap; background-color: #0d1117; color: #c9d1d9; word-wrap: break-word;"
-                ref="terminalOutput"
-              >
-                <div v-for="(line, index) in terminalLines" :key="index" v-html="formatTerminalOutput(line.data || line)"></div>
-                <div v-if="terminalLines.length === 0" class="text-muted">
-                  <div v-if="!isBotConnected()">
-                    ⚠️ El bot no está conectado al servidor.
-                  </div>
-                  <div v-else-if="!terminalConnected">
-                    🖥️ Terminal listo. Presiona "Iniciar Terminal" para comenzar.
-                  </div>
-                  <div v-else>
-                    ⏳ Iniciando sesión de terminal...
-                  </div>
-                </div>
-              </div>
-              <div class="terminal-input border-top border-secondary p-2" style="background-color: #161b22;">
-                <div class="input-group">
-                  <span 
-                    class="input-group-text bg-dark border-secondary"
-                    :class="getTerminalStatusClass()"
-                  >
-                    <i class="bi bi-terminal"></i>
-                    {{ getTerminalStatusText() }}
-                  </span>
-                  <input 
-                    type="text" 
-                    class="form-control bg-dark text-light border-secondary terminal-input-field"
-                    placeholder="Escribe en la terminal..."
-                    v-model="terminalInput"
-                    @keydown="handleTerminalKeydown"
-                    :disabled="!isBotConnected()"
-                    ref="terminalInputField"
-                  >
-                  <button 
-                    :class="isBotConnected() ? 'btn btn-outline-success' : 'btn btn-outline-secondary'" 
-                    @click="startTerminalSession"
-                    v-if="!terminalConnected"
-                    :disabled="!isBotConnected()"
-                    :title="isBotConnected() ? 'Iniciar sesión de terminal' : 'Bot no conectado al servidor'"
-                  >
-                    <i class="bi bi-play-circle"></i>
-                    {{ isBotConnected() ? 'Iniciar Terminal' : 'Bot Desconectado' }}
-                  </button>
-                  <button 
-                    class="btn btn-outline-danger" 
-                    @click="stopTerminalSession"
-                    v-if="terminalConnected"
-                    title="Terminar sesión de terminal"
-                  >
-                    <i class="bi bi-stop-circle"></i>
-                    Terminar Terminal
-                  </button>
-                  <span 
-                    v-if="!isBotConnected()"
-                    class="btn btn-outline-secondary disabled"
-                    title="Bot no está conectado al servidor"
-                  >
-                    <i class="bi bi-exclamation-triangle"></i>
-                    Bot Desconectado
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="modal-footer border-secondary">
-            <button type="button" class="btn btn-outline-warning" @click="clearTerminal">
-              <i class="bi bi-trash"></i>
-              Limpiar Terminal
-            </button>
-            <div class="btn-group">
-              <button 
-                type="button" 
-                class="btn btn-outline-info" 
-                @click="sendTerminalCommand('clear')"
-                :disabled="!terminalConnected || !isBotConnected()"
-                title="Limpiar pantalla"
-              >
-                <i class="bi bi-eraser"></i>
-                Clear
-              </button>
-              <button 
-                type="button" 
-                class="btn btn-outline-info" 
-                @click="sendTerminalCommand('exit')"
-                :disabled="!terminalConnected || !isBotConnected()"
-                title="Salir"
-              >
-                <i class="bi bi-box-arrow-right"></i>
-                Exit
-              </button>
-            </div>
-            <button 
-              type="button" 
-              class="btn btn-outline-danger" 
-              @click="clearBotSession"
-              title="Limpiar sesión del bot"
-            >
-              <i class="bi bi-x-circle"></i>
-              Limpiar Sesión
-            </button>
-            <button type="button" class="btn btn-secondary" @click="selectedBotForConsole = null">
-              Cerrar
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- Console Modal migrado a BotConsoleModal.vue -->
+    <BotConsoleModal
+      v-if="selectedBotForConsole"
+      :selectedBotForConsole="selectedBotForConsole"
+      :terminalLines="terminalLines"
+      :terminalConnected="terminalConnected"
+      :terminalInputField="terminalInputField"
+      :getTerminalStatusClass="getTerminalStatusClass"
+      :getTerminalStatusText="getTerminalStatusText"
+      :isBotConnected="isBotConnected"
+      :formatTerminalOutput="formatTerminalOutput"
+      :handleTerminalKeydown="handleTerminalKeydown"
+      :startTerminalSession="startTerminalSession"
+      :stopTerminalSession="disconnectTerminal"
+      :clearTerminal="clearTerminal"
+      :sendTerminalCommand="sendTerminalCommand"
+      :clearBotSession="clearBotSession"
+      @close="selectedBotForConsole = null"
+    />
   </div>
 
   <!-- Modal para Datos de Bot migrado a BotDataQuery.vue -->
@@ -260,6 +154,7 @@ import BotDetails from './BotDetails.vue';
 import BotCard from './BotCard.vue';
 import SendZipModal from './SendZipModal.vue';
 import BotDataQuery from './BotDataQuery.vue';
+import BotConsoleModal from './BotConsoleModal.vue';
 import LoginForm from './LoginForm.vue';
 import HeaderNav from './HeaderNav.vue';
 import StatsCard from './StatsCard.vue';
@@ -804,19 +699,20 @@ function toggleRawMode() {
 }
 
 function sendTerminalCommand(directCommand = null) {
+  console.log('[sendTerminalCommand] Comando recibido:', directCommand);
   if (!terminalConnected.value || !terminalSessionId.value) return;
-  
-  // Usar comando directo o el valor del input
   let command;
-  if (directCommand) {
+  if (directCommand !== null && typeof directCommand === 'string') {
+    if (!directCommand.trim()) return;
     command = directCommand + '\r';
-  } else {
-    if (!terminalInput.value.trim()) return;
-    command = terminalInput.value + '\r';
-    // Limpiar el input solo si se envía desde el input
+    // Limpiar el input solo si el comando vino del input
     terminalInput.value = '';
+  } else if (terminalInput.value && terminalInput.value.trim()) {
+    command = terminalInput.value + '\r';
+    terminalInput.value = '';
+  } else {
+    return;
   }
-  
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({
       type: 'pty_input',
