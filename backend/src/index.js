@@ -396,28 +396,20 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
 // Configurar CORS
+const corsOriginsEnv = process.env.CORS_ORIGINS || '';
+const allowedOrigins = corsOriginsEnv.split(',').map(o => o.trim()).filter(Boolean);
 const corsOptions = {
   origin: function (origin, callback) {
-    // Permitir sin origin (para aplicaciones móviles, Postman, etc.)
     if (!origin) return callback(null, true);
-    
-    const allowedOrigins = [
-      'http://localhost:5173', // Vite dev server
-      'http://localhost:8080', // Producción en el mismo puerto
-      'http://127.0.0.1:5173',
-      'http://127.0.0.1:8080'
-    ];
-    
-    if (allowedOrigins.includes(origin)) {
+    if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       console.warn(`CORS: Origen no permitido: ${origin}`);
-      callback(null, true); // Por ahora permitir todos en desarrollo
+      callback(new Error('No permitido por CORS'));
     }
   },
   credentials: true
 };
-
 app.use(cors(corsOptions));
 
 // Middleware para parsear JSON
