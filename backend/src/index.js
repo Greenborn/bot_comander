@@ -12,17 +12,20 @@
     return;
   }
   // Configuración de multer para archivos ZIP
-  const upload = multer({
-    storage: multer.memoryStorage(),
-    limits: { fileSize: 20 * 1024 * 1024 }, // 20MB máx
-    fileFilter: (req, file, cb) => {
-      if (file.mimetype === 'application/zip' || file.originalname.endsWith('.zip')) {
-        cb(null, true);
-      } else {
-        cb(new Error('Solo se permiten archivos .zip'));
+    // Leer el límite de tamaño de archivo desde .env (MB)
+    const maxFileSizeMB = process.env.MAX_FILE_SIZE_MB || 100;
+    const maxFileSize = Number(maxFileSizeMB) * 1024 * 1024;
+    const upload = multer({
+      storage: multer.memoryStorage(),
+      limits: { fileSize: maxFileSize }, // Límite configurable en MB
+      fileFilter: (req, file, cb) => {
+        if (file.mimetype === 'application/zip' || file.originalname.endsWith('.zip')) {
+          cb(null, true);
+        } else {
+          cb(new Error('Solo se permiten archivos .zip'));
+        }
       }
-    }
-  });
+    });
 
   // Endpoint para enviar ZIP a un bot (privado)
   app.post('/api/send-zip', authenticateToken, upload.single('zip'), async (req, res) => {
