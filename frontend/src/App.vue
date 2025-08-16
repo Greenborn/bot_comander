@@ -254,16 +254,17 @@
     </div>
     </div>
 
-    <!-- Console Modal -->
-    <div class="modal fade" id="consoleModal" tabindex="-1" aria-labelledby="consoleModalLabel" aria-hidden="true">
+    <!-- Console Modal controlado solo por Vue -->
+    <div v-if="selectedBotForConsole" class="modal-backdrop" style="z-index: 1050;"></div>
+    <div v-if="selectedBotForConsole" class="modal show d-block" tabindex="-1" aria-labelledby="consoleModalLabel" aria-modal="true" role="dialog" style="z-index: 1060;">
       <div class="modal-dialog modal-lg">
         <div class="modal-content bg-dark text-light">
           <div class="modal-header border-secondary">
             <h5 class="modal-title" id="consoleModalLabel">
               <i class="bi bi-terminal"></i>
-              Consola - {{ selectedBot?.botName || 'Bot' }}
+              Consola - {{ selectedBotForConsole?.botName || 'Bot' }}
             </h5>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            <button type="button" class="btn-close btn-close-white" @click="selectedBotForConsole = null" aria-label="Close"></button>
           </div>
           <div class="modal-body p-0">
             <div class="terminal-container" style="height: 400px; background-color: #0d1117;">
@@ -371,7 +372,7 @@
               <i class="bi bi-x-circle"></i>
               Limpiar Sesión
             </button>
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+            <button type="button" class="btn btn-secondary" @click="selectedBotForConsole = null">
               Cerrar
             </button>
           </div>
@@ -381,7 +382,7 @@
   </div>
 
   <!-- Modal para Datos de Bot migrado a BotDataQuery.vue -->
-  <BotDataQuery v-if="selectedBot" :bot="selectedBot" @close="selectedBot = null" />
+  <BotDataQuery v-if="selectedBotForData" :bot="selectedBotForData" @close="selectedBotForData = null" />
 
   <!-- Modal para Enviar ZIP -->
   <SendZipModal
@@ -422,7 +423,8 @@ const loginForm = ref({
 });
 
 // Console related variables
-const selectedBot = ref(null);
+const selectedBotForConsole = ref(null);
+const selectedBotForData = ref(null);
 const consoleOutput = ref([]);
 const currentCommand = ref('');
 const commandExecuting = ref(false);
@@ -707,7 +709,7 @@ function initializeWebSocket() {
 
 // Console functions - ahora con PTY
 function openConsole(bot) {
-  selectedBot.value = bot;
+  selectedBotForConsole.value = bot;
   
   // Obtener o crear sesión para este bot
   let session = botTerminalSessions.value.get(bot.id);
@@ -768,7 +770,7 @@ function openConsole(bot) {
 
 // PTY functions para el modal de consola
 function startTerminalSession() {
-  if (!selectedBot.value || terminalConnected.value) return;
+  if (!selectedBotForConsole.value || terminalConnected.value) return;
   
   // Calcular dimensiones automáticamente
   const dimensions = calculateTerminalDimensions();
@@ -782,7 +784,7 @@ function startTerminalSession() {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({
       type: 'pty_start',
-      targetBot: selectedBot.value.id,
+      targetBot: selectedBotForConsole.value.id,
       requestId: requestId,
       interactive: true,
       cols: terminalCols.value,
@@ -797,7 +799,7 @@ function killTerminalSession() {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({
       type: 'pty_kill',
-      targetBot: selectedBot.value.id,
+      targetBot: selectedBotForConsole.value.id,
       sessionId: terminalSessionId.value,
       signal: 'SIGTERM'
     }));
@@ -817,7 +819,7 @@ function resizeTerminal() {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({
       type: 'pty_resize',
-      targetBot: selectedBot.value.id,
+      targetBot: selectedBotForConsole.value.id,
       sessionId: terminalSessionId.value,
       cols: terminalCols.value,
       rows: terminalRows.value
@@ -862,7 +864,7 @@ function handleTerminalKeydown(event) {
   if (data && ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({
       type: 'pty_input',
-      targetBot: selectedBot.value.id,
+      targetBot: selectedBotForConsole.value.id,
       sessionId: terminalSessionId.value,
       data: data
     }));
@@ -874,8 +876,8 @@ function clearTerminal() {
 }
 
 function clearBotSession() {
-  if (selectedBot.value) {
-    const botId = selectedBot.value.id;
+  if (selectedBotForConsole.value) {
+    const botId = selectedBotForConsole.value.id;
     
     // Eliminar sesión del bot
     botTerminalSessions.value.delete(botId);
@@ -886,7 +888,7 @@ function clearBotSession() {
     terminalLines.value = [];
     terminalInput.value = '';
     
-    console.log(`Sesión PTY limpiada para ${selectedBot.value.botName}`);
+    console.log(`Sesión PTY limpiada para ${selectedBotForConsole.value.botName}`);
     
     // Agregar mensaje informativo
     terminalLines.value.push({
@@ -903,10 +905,10 @@ function hasActiveTerminalSession(bot) {
 }
 
 function getTerminalStatusText() {
-  if (!selectedBot.value) return 'Sin bot';
+  if (!selectedBotForConsole.value) return 'Sin bot';
   
   // Verificar si el bot está conectado al servidor
-  const isConnected = bots.value.some(bot => bot.id === selectedBot.value.id);
+  const isConnected = bots.value.some(bot => bot.id === selectedBotForConsole.value.id);
   if (!isConnected) return 'Bot desconectado';
   
   // Si tiene sesión PTY activa
@@ -919,10 +921,10 @@ function getTerminalStatusText() {
 }
 
 function getTerminalStatusClass() {
-  if (!selectedBot.value) return 'text-muted';
+  if (!selectedBotForConsole.value) return 'text-muted';
   
   // Verificar si el bot está conectado al servidor
-  const isConnected = bots.value.some(bot => bot.id === selectedBot.value.id);
+  const isConnected = bots.value.some(bot => bot.id === selectedBotForConsole.value.id);
   if (!isConnected) return 'text-danger';
   
   // Si tiene sesión PTY activa
@@ -935,8 +937,8 @@ function getTerminalStatusClass() {
 }
 
 function isBotConnected() {
-  if (!selectedBot.value) return false;
-  return bots.value.some(bot => bot.id === selectedBot.value.id);
+  if (!selectedBotForConsole.value) return false;
+  return bots.value.some(bot => bot.id === selectedBotForConsole.value.id);
 }
 
 function toggleRawMode() {
@@ -960,7 +962,7 @@ function sendTerminalCommand(directCommand = null) {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({
       type: 'pty_input',
-      targetBot: selectedBot.value.id,
+      targetBot: selectedBotForConsole.value.id,
       sessionId: terminalSessionId.value,
       data: command
     }));
@@ -969,12 +971,12 @@ function sendTerminalCommand(directCommand = null) {
 }
 
 function listTerminalSessions() {
-  if (!selectedBot.value) return;
+  if (!selectedBotForConsole.value) return;
   
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({
       type: 'pty_list',
-      targetBot: selectedBot.value.id
+      targetBot: selectedBotForConsole.value.id
     }));
   }
 }
@@ -990,7 +992,7 @@ function handlePtyMessage(data) {
   
   // Para pty_started, usamos el bot seleccionado
   if (data.type === 'pty_started') {
-    const botId = selectedBot.value?.id;
+    const botId = selectedBotForConsole.value?.id;
     if (!botId) return;
     
     handlePtyStarted(data, botId);
@@ -1022,7 +1024,7 @@ function handlePtyMessage(data) {
       
     case 'pty_sessions_list':
       // Este mensaje es del bot actualmente seleccionado
-      const currentBotId = selectedBot.value?.id;
+      const currentBotId = selectedBotForConsole.value?.id;
       if (currentBotId && currentBotId === botId) {
         handlePtySessionsList(data);
       }
@@ -1030,7 +1032,7 @@ function handlePtyMessage(data) {
       
     case 'pty_error':
       // Este mensaje es del bot actualmente seleccionado
-      const errorBotId = selectedBot.value?.id;
+      const errorBotId = selectedBotForConsole.value?.id;
       if (errorBotId && errorBotId === botId) {
         handlePtyError(data);
       }
@@ -1043,7 +1045,7 @@ function handlePtyMessage(data) {
 
 function handlePtyStarted(data, botId) {
   // Solo actualizar UI si es el bot actualmente abierto en el modal
-  const isCurrentBot = selectedBot.value?.id === botId;
+  const isCurrentBot = selectedBotForConsole.value?.id === botId;
   
   if (isCurrentBot) {
     terminalSessionId.value = data.sessionId;
@@ -1106,7 +1108,7 @@ function handlePtyOutput(data, botId) {
   });
   
   // Solo actualizar UI si es el bot actualmente abierto
-  const isCurrentBot = selectedBot.value?.id === botId && terminalSessionId.value === data.sessionId;
+  const isCurrentBot = selectedBotForConsole.value?.id === botId && terminalSessionId.value === data.sessionId;
   if (isCurrentBot) {
     // Limitar líneas en UI para performance
     if (terminalLines.value.length > 50) {
@@ -1142,7 +1144,7 @@ function handlePtySessionEnded(data, botId) {
   sessionToBotMap.value.delete(data.sessionId);
   
   // Solo actualizar UI si es el bot actualmente abierto
-  const isCurrentBot = selectedBot.value?.id === botId && terminalSessionId.value === data.sessionId;
+  const isCurrentBot = selectedBotForConsole.value?.id === botId && terminalSessionId.value === data.sessionId;
   if (isCurrentBot) {
     terminalLines.value.push(endMessage);
     terminalConnected.value = false;
@@ -1177,7 +1179,7 @@ function handlePtyError(data) {
 }
 
 function executeCommand() {
-  if (!currentCommand.value.trim() || commandExecuting.value || !selectedBot.value) {
+  if (!currentCommand.value.trim() || commandExecuting.value || !selectedBotForConsole.value) {
     return;
   }
   
@@ -1186,7 +1188,7 @@ function executeCommand() {
   // Add command to output
   consoleOutput.value.push({
     type: 'command',
-    text: `${selectedBot.value.botName}@system:~$ ${command}`,
+    text: `${selectedBotForConsole.value.botName}@system:~$ ${command}`,
     timestamp: new Date()
   });
   
@@ -1194,7 +1196,7 @@ function executeCommand() {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({
       type: 'system_command',
-      targetBot: selectedBot.value.id,
+      targetBot: selectedBotForConsole.value.id,
       command: command,
       from: 'panel'
     }));
@@ -1399,7 +1401,7 @@ function scrollTerminalToBottom() {
 
 // Función para abrir el modal de datos del bot (ahora delega al componente BotDataQuery)
 function openBotDataModal(bot) {
-  selectedBot.value = bot;
+  selectedBotForData.value = bot;
 }
 
 onUnmounted(() => {
