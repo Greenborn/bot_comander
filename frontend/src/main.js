@@ -10,4 +10,7 @@ import 'bootstrap-icons/font/bootstrap-icons.css';
 // Import Bootstrap JS
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 
+// Importar estilos globales
+import './styles.css';
+
 createApp(App).mount('#app');

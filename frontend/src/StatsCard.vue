@@ -76,20 +76,3 @@ const props = defineProps({
   }
 });
 </script>
-
-<style scoped>
-/* Estilos para las stats cards */
-.card {
-  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-}
-
-.card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-
-.fs-1 {
-  opacity: 0.8;
-}
-/* Puedes mover estilos específicos aquí si lo deseas */
-</style>
