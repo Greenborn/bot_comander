@@ -190,88 +190,50 @@
                   
                   <div v-else class="row">
                     <div v-for="bot in bots" :key="bot.id" class="col-md-6 mb-3">
-                      <div class="card border-left-primary">
-                        <div class="card-body">
-                          <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h6 class="card-title mb-0">
-                              <i class="bi bi-robot text-primary"></i>
-                              {{ bot.botName || `Bot-${bot.id.slice(-4)}` }}
-                            </h6>
-                            <span class="badge bg-success">Online</span>
-                          </div>
-                          <p class="card-text">
-                            <strong>ID:</strong> 
-                            <code class="text-primary">{{ bot.id.slice(-8) }}</code>
-                          </p>
-                          <p class="card-text">
-                            <strong>IPv4:</strong> <span>{{ bot.ipv4 || 'N/A' }}</span><br>
-                            <strong>IPv6:</strong> <span>{{ bot.ipv6 || 'N/A' }}</span><br>
-                            <strong>Espacio libre:</strong>
-                            <span v-if="bot.status && bot.status.systemInfo && typeof bot.status.systemInfo.diskFree === 'number'">
-                              {{ formatFileSize(bot.status.systemInfo.diskFree) }}
-                            </span>
-                            <span v-else class="text-muted">N/A</span>
-                          </p>
-                          <p class="card-text">
-                            <strong>Conectado:</strong><br>
-                            <small class="text-muted">
-                              <i class="bi bi-clock"></i>
-                              {{ new Date(bot.connectedAt).toLocaleString() }}
-                            </small>
-                          </p>
-                          <p class="card-text" v-if="bot.lastActivity">
-                            <strong>Última actividad:</strong><br>
-                            <small class="text-success">
-                              <i class="bi bi-activity"></i>
-                              {{ new Date(bot.lastActivity).toLocaleString() }}
-                            </small>
-                          </p>
-                          <div class="d-flex gap-2 flex-wrap">
-                            <button class="btn btn-sm btn-outline-primary" @click="openBotDetails(bot)">
-                              <i class="bi bi-info-circle"></i>
-                              Detalles
-                            </button>
-  <!-- Componente modularizado para Detalles de Bot -->
-  <BotDetails 
-    :show="showBotDetailsModal" 
-    :bot="botDetailsTarget" 
-    @close="closeBotDetailsModal" 
-  />
-                            <button class="btn btn-sm btn-outline-warning">
-                              <i class="bi bi-gear"></i>
-                              Comandos
-                            </button>
-                            <button 
-                              class="btn btn-sm position-relative"
-                              :class="hasActiveTerminalSession(bot) ? 'btn-success' : 'btn-outline-success'"
-                              @click="openConsole(bot)"
-                            >
-                              <i class="bi bi-terminal"></i>
-                              Consola
-                              <span 
-                                v-if="hasActiveTerminalSession(bot)" 
-                                class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning text-dark"
-                              >
-                                <i class="bi bi-circle-fill" style="font-size: 8px;"></i>
-                                <span class="visually-hidden">Sesión activa</span>
-                              </span>
-                            </button>
-                            <button 
-                              class="btn btn-sm btn-outline-info"
-                              @click="openBotDataModal(bot)"
-                            >
-                              <i class="bi bi-database"></i>
-                              Datos
-                            </button>
-                            <button 
-                              class="btn btn-sm btn-outline-success"
-                              @click="openSendZipModal(bot)"
-                            >
-                              <i class="bi bi-file-earmark-zip"></i>
-                              Enviar ZIP
-                            </button>
-                          </div>
-                        </div>
+                      <BotCard :bot="bot" />
+                      <div class="d-flex gap-2 flex-wrap mt-2">
+                        <button class="btn btn-sm btn-outline-primary" @click="openBotDetails(bot)">
+                          <i class="bi bi-info-circle"></i>
+                          Detalles
+                        </button>
+                        <BotDetails 
+                          :show="showBotDetailsModal" 
+                          :bot="botDetailsTarget" 
+                          @close="closeBotDetailsModal" 
+                        />
+                        <button class="btn btn-sm btn-outline-warning">
+                          <i class="bi bi-gear"></i>
+                          Comandos
+                        </button>
+                        <button 
+                          class="btn btn-sm position-relative"
+                          :class="hasActiveTerminalSession(bot) ? 'btn-success' : 'btn-outline-success'"
+                          @click="openConsole(bot)"
+                        >
+                          <i class="bi bi-terminal"></i>
+                          Consola
+                          <span 
+                            v-if="hasActiveTerminalSession(bot)" 
+                            class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning text-dark"
+                          >
+                            <i class="bi bi-circle-fill" style="font-size: 8px;"></i>
+                            <span class="visually-hidden">Sesión activa</span>
+                          </span>
+                        </button>
+                        <button 
+                          class="btn btn-sm btn-outline-info"
+                          @click="openBotDataModal(bot)"
+                        >
+                          <i class="bi bi-database"></i>
+                          Datos
+                        </button>
+                        <button 
+                          class="btn btn-sm btn-outline-success"
+                          @click="openSendZipModal(bot)"
+                        >
+                          <i class="bi bi-file-earmark-zip"></i>
+                          Enviar ZIP
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -563,12 +525,12 @@
       </div>
     </div>
   </div>
-  <!-- ...existing code... -->
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
 import BotDetails from './BotDetails.vue';
+import BotCard from './BotCard.vue';
 
 const bots = ref([]);
 const panels = ref([]);
@@ -1470,8 +1432,7 @@ function formatTerminalOutput(data) {
     .replace(/\x1B\([0AB]\)/g, '')
     .replace(/\x1B=/g, '')
     .replace(/\x1B>/g, '')
-    .replace(/\x1B\[?\d*[lh]/g, '') // modos del terminal
-    .replace(/\x1B\[\?[\d;]*[lh]/g, '') // modos del terminal con parámetros
+    .replace(/\x1B\[\?[\d;]*[lh]/g, '') // modos del terminal
     .replace(/\x1B\[\d*[rR]/g, '') // configurar región de scroll
     .replace(/\x1B\[\d+;\d+r/g, '') // configurar región de scroll con parámetros
     .replace(/\x1B\]\d+;[^\x07\x1B]*(\x07|\x1B\\)/g, '') // comandos OSC
