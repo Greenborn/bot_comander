@@ -190,51 +190,19 @@
                   
                   <div v-else class="row">
                     <div v-for="bot in bots" :key="bot.id" class="col-md-6 mb-3">
-                      <BotCard :bot="bot" />
-                      <div class="d-flex gap-2 flex-wrap mt-2">
-                        <button class="btn btn-sm btn-outline-primary" @click="openBotDetails(bot)">
-                          <i class="bi bi-info-circle"></i>
-                          Detalles
-                        </button>
-                        <BotDetails 
-                          :show="showBotDetailsModal" 
-                          :bot="botDetailsTarget" 
-                          @close="closeBotDetailsModal" 
-                        />
-                        <button class="btn btn-sm btn-outline-warning">
-                          <i class="bi bi-gear"></i>
-                          Comandos
-                        </button>
-                        <button 
-                          class="btn btn-sm position-relative"
-                          :class="hasActiveTerminalSession(bot) ? 'btn-success' : 'btn-outline-success'"
-                          @click="openConsole(bot)"
-                        >
-                          <i class="bi bi-terminal"></i>
-                          Consola
-                          <span 
-                            v-if="hasActiveTerminalSession(bot)" 
-                            class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning text-dark"
-                          >
-                            <i class="bi bi-circle-fill" style="font-size: 8px;"></i>
-                            <span class="visually-hidden">Sesión activa</span>
-                          </span>
-                        </button>
-                        <button 
-                          class="btn btn-sm btn-outline-info"
-                          @click="openBotDataModal(bot)"
-                        >
-                          <i class="bi bi-database"></i>
-                          Datos
-                        </button>
-                        <button 
-                          class="btn btn-sm btn-outline-success"
-                          @click="openSendZipModal(bot)"
-                        >
-                          <i class="bi bi-file-earmark-zip"></i>
-                          Enviar ZIP
-                        </button>
-                      </div>
+                      <BotCard 
+                        :bot="{ ...bot, hasActiveTerminalSession: hasActiveTerminalSession(bot) }"
+                        @details="openBotDetails"
+                        @commands="() => {}"
+                        @console="openConsole"
+                        @data="openBotDataModal"
+                        @send-zip="openSendZipModal"
+                      />
+                      <BotDetails 
+                        :show="showBotDetailsModal" 
+                        :bot="botDetailsTarget" 
+                        @close="closeBotDetailsModal" 
+                      />
                     </div>
                   </div>
                 </div>
@@ -1659,7 +1627,6 @@ onUnmounted(() => {
 });
 
 
-// ...existing code...
 // Variables y métodos para el modal de detalles del bot
 const showBotDetailsModal = ref(false);
 const botDetailsTarget = ref(null);

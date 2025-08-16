@@ -35,6 +35,45 @@
           {{ formatDate(bot.lastActivity) }}
         </small>
       </p>
+      <div class="d-flex gap-2 flex-wrap mt-2">
+        <button class="btn btn-sm btn-outline-primary" @click="$emit('details', bot)">
+          <i class="bi bi-info-circle"></i>
+          Detalles
+        </button>
+        <button class="btn btn-sm btn-outline-warning" @click="$emit('commands', bot)">
+          <i class="bi bi-gear"></i>
+          Comandos
+        </button>
+        <button 
+          class="btn btn-sm position-relative"
+          :class="hasActiveTerminalSession ? 'btn-success' : 'btn-outline-success'"
+          @click="$emit('console', bot)"
+        >
+          <i class="bi bi-terminal"></i>
+          Consola
+          <span 
+            v-if="hasActiveTerminalSession" 
+            class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning text-dark"
+          >
+            <i class="bi bi-circle-fill" style="font-size: 8px;"></i>
+            <span class="visually-hidden">Sesión activa</span>
+          </span>
+        </button>
+        <button 
+          class="btn btn-sm btn-outline-info"
+          @click="$emit('data', bot)"
+        >
+          <i class="bi bi-database"></i>
+          Datos
+        </button>
+        <button 
+          class="btn btn-sm btn-outline-success"
+          @click="$emit('send-zip', bot)"
+        >
+          <i class="bi bi-file-earmark-zip"></i>
+          Enviar ZIP
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -46,6 +85,12 @@ export default {
     bot: {
       type: Object,
       required: true
+    }
+  },
+  computed: {
+    hasActiveTerminalSession() {
+      // El padre debe pasar esta prop si lo desea, por defecto false
+      return this.bot.hasActiveTerminalSession || false;
     }
   },
   methods: {
