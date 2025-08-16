@@ -24,68 +24,7 @@
       <div class="row">
         <div class="col-12">
           <!-- Stats Cards -->
-          <div class="row mb-4">
-            <div class="col-md-3">
-              <div class="card text-white bg-primary">
-                <div class="card-body">
-                  <div class="d-flex justify-content-between">
-                    <div>
-                      <h5 class="card-title">Total Bots</h5>
-                      <h2 class="mb-0">{{ stats.totalBots }}</h2>
-                    </div>
-                    <div class="align-self-center">
-                      <i class="bi bi-robot fs-1"></i>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-3">
-              <div class="card text-white bg-success">
-                <div class="card-body">
-                  <div class="d-flex justify-content-between">
-                    <div>
-                      <h5 class="card-title">Bots Activos</h5>
-                      <h2 class="mb-0">{{ stats.totalBots }}</h2>
-                    </div>
-                    <div class="align-self-center">
-                      <i class="bi bi-wifi fs-1"></i>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-3">
-              <div class="card text-white bg-info">
-                <div class="card-body">
-                  <div class="d-flex justify-content-between">
-                    <div>
-                      <h5 class="card-title">Paneles</h5>
-                      <h2 class="mb-0">{{ stats.totalPanels }}</h2>
-                    </div>
-                    <div class="align-self-center">
-                      <i class="bi bi-display fs-1"></i>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-3">
-              <div class="card text-white bg-warning">
-                <div class="card-body">
-                  <div class="d-flex justify-content-between">
-                    <div>
-                      <h5 class="card-title">Estado</h5>
-                      <h6 class="mb-0">{{ connectionStatus }}</h6>
-                    </div>
-                    <div class="align-self-center">
-                      <i class="bi bi-activity fs-1"></i>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <StatsCard :stats="stats" :connectionStatus="connectionStatus" />
 
           <!-- Bots List -->
           <div class="row">
@@ -323,6 +262,7 @@ import SendZipModal from './SendZipModal.vue';
 import BotDataQuery from './BotDataQuery.vue';
 import LoginForm from './LoginForm.vue';
 import HeaderNav from './HeaderNav.vue';
+import StatsCard from './StatsCard.vue';
 
 const bots = ref([]);
 const panels = ref([]);
@@ -1364,18 +1304,6 @@ function closeBotDetailsModal() {
 
 .navbar-brand {
   font-weight: 600;
-}
-
-.badge {
-  font-size: 0.9em;
-}
-
-.btn {
-  transition: all 0.2s ease-in-out;
-}
-
-.fs-1 {
-  opacity: 0.8;
 }
 
 code {
