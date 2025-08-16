@@ -59,6 +59,10 @@
             <span class="visually-hidden">Sesión activa</span>
           </span>
         </button>
+          <button class="btn btn-sm btn-outline-info" @click="showFileExplorerModal = true">
+            <i class="bi bi-folder2-open"></i>
+            Explorar archivos
+          </button>
         <button 
           class="btn btn-sm btn-outline-info"
           @click="$emit('data', bot)"
@@ -78,7 +82,11 @@
   </div>
 </template>
 
+<FileExplorerModal v-if="showFileExplorerModal" :bot="bot" @close="showFileExplorerModal = false" />
+
 <script>
+import FileExplorerModal from './FileExplorerModal.vue';
+
 export default {
   name: 'BotCard',
   props: {
@@ -87,11 +95,24 @@ export default {
       required: true
     }
   },
+  data() {
+    return {
+      showFileExplorerModal: false
+    };
+  },
+  data() {
+    return {
+      showFileExplorerModal: false
+    };
+  },
   computed: {
     hasActiveTerminalSession() {
       // El padre debe pasar esta prop si lo desea, por defecto false
       return this.bot.hasActiveTerminalSession || false;
     }
+  },
+  components: {
+    FileExplorerModal
   },
   methods: {
     formatFileSize(bytes) {
@@ -122,3 +143,8 @@ export default {
   border-left: 4px solid #007bff !important;
 }
 </style>
+    data() {
+      return {
+        showFileExplorerModal: false
+      };
+    }
